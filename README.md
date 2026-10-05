@@ -21,11 +21,11 @@ writes scripts, gaze and emphasis rendering.
 ## Install
 
 Requires Node.js 22.18+ and ffmpeg. The package includes the mesh avatar engine, so nothing
-else is needed to render. (It is not on npm yet; `npm pack` in this repository makes the
-package, or install from a checkout.)
+else is needed to render.
 
 ```sh
 npm install avatarscript
+npm install onnxruntime-node             # only for --tts openai or gemini (timing by alignment, ~290 MB)
 echo "ELEVENLABS_API_KEY=..." > .env    # read from the environment or ./.env
 ```
 

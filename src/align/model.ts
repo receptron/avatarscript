@@ -9,7 +9,7 @@ import { finished } from "node:stream/promises";
 import type { InferenceSession } from "onnxruntime-node";
 import { z } from "zod";
 import { resample } from "../audio.ts";
-import { parseJson } from "../json.ts";
+import { errorCode, parseJson } from "../json.ts";
 import { CLASSES, tokenClass, type PhoneClass } from "./classes.ts";
 
 const REPO = "https://huggingface.co/sadda-speech/wav2vec2-espeak-ctc/resolve/main";
@@ -61,9 +61,24 @@ export interface ClassEmissions {
 
 let loaded: Promise<{ session: InferenceSession; classOf: Int16Array; blank: number }> | null = null;
 
+/**
+ * onnxruntime-node is an optional peer dependency (~290 MB): only providers without their own
+ * timing (openai, gemini) need it.
+ */
+async function onnxRuntime(): Promise<typeof import("onnxruntime-node")> {
+  try {
+    return await import("onnxruntime-node");
+  } catch (error) {
+    if (errorCode(error) === "ERR_MODULE_NOT_FOUND") {
+      throw new Error("timing speech from openai or gemini needs onnxruntime-node: npm install onnxruntime-node", { cause: error });
+    }
+    throw error;
+  }
+}
+
 async function load(onDownload?: (what: string) => void) {
+  const ort = await onnxRuntime();
   const files = await ensureFiles(onDownload);
-  const ort = await import("onnxruntime-node");
   const vocab = parseJson(z.record(z.string(), z.number().int()), await readFile(files.vocab, "utf8"), files.vocab);
   const size = Math.max(...Object.values(vocab)) + 1;
   // -1: not a phoneme; otherwise the class index
@@ -81,7 +96,7 @@ async function load(onDownload?: (what: string) => void) {
 export async function classEmissions(samples: Float32Array, sampleRate: number, onDownload?: (what: string) => void): Promise<ClassEmissions> {
   loaded ??= load(onDownload);
   const { session, classOf, blank } = await loaded;
-  const ort = await import("onnxruntime-node");
+  const ort = await onnxRuntime();
   const x = resample(samples, sampleRate, MODEL_RATE);
   let mean = 0;
   for (const v of x) mean += v;

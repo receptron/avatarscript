@@ -2,11 +2,40 @@
   "name": "avatarscript",
   "version": "0.1.0",
   "description": "Turn an avatar and text into a lip-synced, acted video.",
+  "keywords": [
+    "avatar",
+    "lip-sync",
+    "tts",
+    "elevenlabs",
+    "video"
+  ],
+  "homepage": "https://github.com/receptron/avatarscript#readme",
+  "bugs": {
+    "url": "https://github.com/receptron/avatarscript/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/receptron/avatarscript.git"
+  },
   "license": "MIT",
+  "author": "receptron",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "bin": {
     "avatarscript": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=22.18"
   },
@@ -22,9 +51,16 @@
   },
   "dependencies": {
     "kuromoji": "^0.1.2",
-    "onnxruntime-node": "^1.30.0",
     "puppeteer": "^25.12.0",
     "zod": "^4.6.5"
+  },
+  "peerDependencies": {
+    "onnxruntime-node": "^1.30.0"
+  },
+  "peerDependenciesMeta": {
+    "onnxruntime-node": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -37,33 +73,10 @@
     "eslint-plugin-security": "^4.2.0",
     "eslint-plugin-sonarjs": "^4.2.2",
     "globals": "^17.13.0",
+    "onnxruntime-node": "^1.30.0",
     "prettier": "^3.9.9",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/receptron/avatarscript.git"
-  },
-  "keywords": [
-    "avatar",
-    "lip-sync",
-    "tts",
-    "elevenlabs",
-    "video"
-  ]
+  }
 }
