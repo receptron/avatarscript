@@ -65,7 +65,8 @@ function letterViseme(w: string[], word: string[], i: number): Viseme | null {
     next = w[i + 1] ?? "",
     last = w.length - 1;
   if (c === next && !VOWELS.has(c)) return null; // doubled consonant
-  if (word[i].toLowerCase() === "e" && i === last && w.length > 2 && !VOWELS.has(w[i - 1])) return null; // silent e
+  // silent e: "make", not "the" (it needs a vowel before it)
+  if (word[i].toLowerCase() === "e" && i === last && !VOWELS.has(w[i - 1]) && w.slice(0, i - 1).some((x) => VOWELS.has(x))) return null;
   if (c === "c" && next !== "" && "eiy".includes(next)) return "SS";
   if (c === "u" && (i === last || w[i - 1] === "q" || (i + 2 === last && w[i + 2] === "e"))) return "ou";
   return Object.hasOwn(LETTERS, c) ? LETTERS[c] : null;

@@ -2,25 +2,35 @@
 // normalized to `Speech`, so application code does not change when the provider or model does.
 import { z } from "zod";
 import { resample } from "../audio.ts";
+import { alignText } from "../align/index.ts";
+import type { CharTime } from "../g2p/types.ts";
 import { check } from "../json.ts";
-import { withCache } from "./cache.ts";
+import { isSpoken, refineTiming, silences, trimToVoice } from "../timing.ts";
+import { cachedSynthesis, type NativeSynthesis } from "./cache.ts";
 import { elevenLabsProvider } from "./elevenlabs.ts";
+import { geminiProvider } from "./gemini.ts";
 import { mockProvider } from "./mock.ts";
-import type { ProviderDefinition, Speech, TextToSpeech } from "./types.ts";
+import { openAiProvider } from "./openai.ts";
+import type { NativeSpeech, ProviderDefinition, Speech, SpeechRequest, TextToSpeech, TimingSource } from "./types.ts";
 
 export type { Speech, SpeechRequest, TextToSpeech } from "./types.ts";
 
 /** Sample rate of every `Speech`. */
 export const SPEECH_SAMPLE_RATE = 24000;
 
-/** Providers with per-character timing. `mock` is an offline buzz for tests, not speech. */
-export const TTS_PROVIDERS = ["elevenlabs", "mock"] as const;
+/**
+ * elevenlabs returns character timing; openai and gemini return audio only and are timed by
+ * forced alignment (a 635 MB model downloaded once). `mock` is an offline buzz for tests, not speech.
+ */
+export const TTS_PROVIDERS = ["elevenlabs", "openai", "gemini", "mock"] as const;
 export type TtsProvider = (typeof TTS_PROVIDERS)[number];
 export const isTtsProvider = (v: string): v is TtsProvider => TTS_PROVIDERS.some((p) => p === v);
 
 // A Record over the provider names: a name without a definition is a type error.
 const DEFINITIONS: Record<TtsProvider, ProviderDefinition> = {
   elevenlabs: elevenLabsProvider,
+  openai: openAiProvider,
+  gemini: geminiProvider,
   mock: mockProvider,
 };
 
@@ -52,6 +62,35 @@ export function normalizeSpeech(speech: Speech, text: string, provider: string):
   return { samples, sampleRate: SPEECH_SAMPLE_RATE, timing };
 }
 
+/** Thresholds for audio that does not say the text, measured on instructions read aloud by Gemini. */
+const MAX_UNEXPLAINED_VOICE = 0.25; // seconds of voice outside the aligned text
+const MAX_MISMATCH = 0.6; // nats per frame between what the model hears and the text
+
+/** Why the aligned audio does not seem to say the text, or null when it does. */
+function mismatchReason(text: string, timing: CharTime[], mismatch: number, native: NativeSpeech): string | null {
+  const chars = Array.from(text);
+  const spoken = timing.filter((_, k) => isSpoken(chars[k]));
+  const voice = silences(native.samples, native.sampleRate);
+  if (!voice || !spoken.length) return null;
+  const outside = Math.max(0, spoken[0].start - voice.onset) + Math.max(0, voice.offset - (spoken.at(-1)?.end ?? 0));
+  if (outside > MAX_UNEXPLAINED_VOICE) return `${outside.toFixed(2)} s of speech that is not in the text`;
+  if (mismatch > MAX_MISMATCH) return `the speech does not match the text (score ${mismatch.toFixed(2)})`;
+  return null;
+}
+
+/** Character timing for native speech, by the provider's timing source. */
+async function timingFor(source: TimingSource, native: NativeSpeech, text: string): Promise<{ timing: CharTime[]; problem: string | null }> {
+  const chars = Array.from(text);
+  if (source !== "aligned") {
+    if (!native.timing) throw new Error("provider returned no timing");
+    const timing = source === "provider+refine" ? refineTiming(chars, native.timing, native.samples, native.sampleRate) : native.timing;
+    return { timing, problem: null };
+  }
+  const aligned = await alignText(text, native.samples, native.sampleRate);
+  const timing = trimToVoice(chars, aligned.timing, native.samples, native.sampleRate);
+  return { timing, problem: mismatchReason(text, timing, aligned.mismatch, native) };
+}
+
 /** A text-to-speech engine for the given provider. */
 export function createTts(config: TtsConfig): TextToSpeech {
   const c = check(TtsConfigSchema, config, "text-to-speech config");
@@ -62,12 +101,17 @@ export function createTts(config: TtsConfig): TextToSpeech {
   const model = c.model ?? definition.defaultModel;
   const voice = c.voice ?? definition.defaultVoice;
   const options = c.options ?? {};
-  const native = definition.create({ apiKey, model, voice, options });
-  const engine: TextToSpeech = {
-    provider: c.provider,
-    model,
-    voice,
-    synthesize: async (request) => normalizeSpeech(await native(request), request.text, c.provider),
+  const create = definition.create({ apiKey, model, voice, options });
+  const native: NativeSynthesis = c.cacheDir
+    ? cachedSynthesis(create, c.cacheDir, { provider: c.provider, model, voice, options })
+    : (request) => create(request);
+  // audio that does not say the text (a provider reading extra words) is requested once more
+  const synthesize = async (request: SpeechRequest, attempt = 1): Promise<Speech> => {
+    const speech = await native(request, { fresh: attempt > 1 });
+    const { timing, problem } = await timingFor(definition.timing, speech, request.text);
+    if (!problem) return normalizeSpeech({ ...speech, timing }, request.text, c.provider);
+    if (attempt < 2) return synthesize(request, attempt + 1);
+    throw new Error(`${c.provider} speech for "${request.text}" does not match the text: ${problem}`);
   };
-  return c.cacheDir ? withCache(engine, c.cacheDir, options) : engine;
+  return { provider: c.provider, model, voice, synthesize: (request) => synthesize(request) };
 }

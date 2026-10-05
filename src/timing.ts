@@ -26,8 +26,8 @@ function dropBursts(loud: boolean[]): boolean[] {
   return out;
 }
 
-/** Silent stretches of the audio, [start, end] in seconds (including the edges). */
-export function silences(samples: Float32Array, sampleRate: number): { gaps: [number, number][]; onset: number; offset: number } | null {
+/** Whether each FRAME of the audio is voiced (short bursts excluded). */
+export function voicedFrames(samples: Float32Array, sampleRate: number): boolean[] {
   const hop = Math.round(sampleRate * FRAME),
     n = Math.floor(samples.length / hop);
   const db = new Float32Array(n);
@@ -38,7 +38,26 @@ export function silences(samples: Float32Array, sampleRate: number): { gaps: [nu
   }
   const peak = Math.max(...db);
   const threshold = Math.max(-50, peak - 35);
-  const loud = dropBursts(Array.from(db, (v) => v > threshold));
+  return dropBursts(Array.from(db, (v) => v > threshold));
+}
+
+/**
+ * Ends each spoken character that comes before a space, punctuation or the end of the text where
+ * the voice stops: an aligner tends to stretch the last sound of a phrase into the silence after it.
+ */
+export function trimToVoice(chars: string[], timing: CharTime[], samples: Float32Array, sampleRate: number): CharTime[] {
+  const loud = voicedFrames(samples, sampleRate);
+  return timing.map((t, k) => {
+    if (!isSpoken(chars[k]) || isSpoken(chars[k + 1] ?? " ")) return t;
+    let last = Math.min(loud.length, Math.ceil(t.end / FRAME)) - 1;
+    while (last >= 0 && !loud[last] && (last + 1) * FRAME > t.start + MIN_VOICE) last--;
+    return { start: t.start, end: Math.max(t.start + MIN_VOICE, Math.min(t.end, (last + 1) * FRAME)) };
+  });
+}
+
+/** Silent stretches of the audio, [start, end] in seconds (including the edges). */
+export function silences(samples: Float32Array, sampleRate: number): { gaps: [number, number][]; onset: number; offset: number } | null {
+  const loud = voicedFrames(samples, sampleRate);
   const first = loud.indexOf(true),
     last = loud.lastIndexOf(true);
   if (first < 0) return null;
@@ -61,11 +80,12 @@ export function refineTiming(chars: string[], timing: CharTime[], samples: Float
   if (!audio || !spoken.length) return timing;
   const anchors: [from: number, to: number][] = [[timing[spoken[0]].start, audio.onset]];
   const used = new Set<number>();
-  // each run of unspoken characters between two spoken ones may sit on a silence
+  // each punctuation run between two spoken characters may sit on a silence
   for (let k = 0; k + 1 < spoken.length; k++) {
     const a = spoken[k],
       b = spoken[k + 1];
-    if (b === a + 1) continue;
+    // only punctuation marks a pause; a space between words is usually not silent
+    if (b === a + 1 || !chars.slice(a + 1, b).some((c) => /\p{P}/u.test(c))) continue;
     const ps = timing[a].end,
       pe = timing[b].start;
     let best = -1,

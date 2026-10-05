@@ -115,6 +115,12 @@ function tokenVisemes(token: kuromoji.IpadicFeatures, times: CharTime[], fallbac
   });
 }
 
+/** kuromoji tokens of Japanese text: surface form and katakana reading (if known). */
+export async function tokenizeJapanese(text: string): Promise<{ surface: string; reading: string | null }[]> {
+  const t = await getTokenizer();
+  return t.tokenize(text).map((token) => ({ surface: token.surface_form, reading: token.reading && token.reading !== "*" ? token.reading : null }));
+}
+
 /**
  * Visemes for a run of Japanese characters. Tokens whose reading is unknown get the caller's
  * generic mouth movement.

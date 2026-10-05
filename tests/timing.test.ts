@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { refineTiming, silences } from "../src/timing.ts";
+import { refineTiming, silences, trimToVoice } from "../src/timing.ts";
 
 const RATE = 8000;
 /** Audio that is voiced in the given spans and silent elsewhere. */
@@ -56,6 +56,21 @@ describe("refineTiming", () => {
       1.6,
     );
     expect(silences(withClick, RATE)?.offset).toBeCloseTo(1.1, 2);
+  });
+
+  it("ends a phrase's last sound where the voice stops", () => {
+    // an aligner stretched "b" over the pause after it
+    const timing = [
+      { start: 0.1, end: 0.3 },
+      { start: 0.3, end: 0.68 },
+      { start: 0.68, end: 0.7 },
+      { start: 0.7, end: 0.9 },
+      { start: 0.9, end: 1.1 },
+    ];
+    const out = trimToVoice([..."ab、cd"], timing, audio, RATE);
+    expect(out[1].end).toBeCloseTo(0.5, 2);
+    expect(out[0]).toEqual(timing[0]); // inside a word: untouched
+    expect(out[4].end).toBeCloseTo(1.1, 2);
   });
 
   it("leaves timing alone for silent audio", () => {

@@ -14,9 +14,9 @@ See [PLAN.md](PLAN.md) for the design and milestones.
 
 ## Status
 
-Early, but working end to end: ElevenLabs speech, Japanese and English lip sync, emotions and
-motions, rendered to MP4 with the mesh engine. Not yet: the LLM step that writes scripts,
-gaze and emphasis rendering, other TTS providers.
+Early, but working end to end: speech from ElevenLabs, OpenAI or Gemini, Japanese and English
+lip sync, emotions and motions, rendered to MP4 with the mesh engine. Not yet: the LLM step that
+writes scripts, gaze and emphasis rendering.
 
 ## Install
 
@@ -75,8 +75,26 @@ does not change when the provider or model does:
   not match the text is an error.
 - `model` and `voice` default to the provider's; `apiKey` defaults to its environment variable.
   Provider-specific settings go in `options` and are checked by that provider.
-- Providers today: `elevenlabs` (options: `emotionTags`, `seed`) and `mock`, an offline buzz with
-  exact timing for tests. More need per-character timing or, later, forced alignment (see PLAN.md).
+- Providers today:
+
+  | provider | key | timing | voice emotion | options |
+  |---|---|---|---|---|
+  | `elevenlabs` | `ELEVENLABS_API_KEY` | ElevenLabs', corrected against the audio | v3 audio tags | `emotionTags`, `seed` |
+  | `openai` | `OPENAI_API_KEY` | forced alignment | `instructions` (gpt-4o-mini-tts) | `emotionInstructions`, `speed` |
+  | `gemini` | `GEMINI_API_KEY` | forced alignment | none: only the text is sent | — |
+  | `mock` | — | exact, made up | — | — |
+
+- OpenAI and Gemini return audio only. Since the text is known, its timing is found by **forced
+  alignment**: a phoneme model ([wav2vec2-lv-60-espeak-cv-ft](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft),
+  Apache-2.0, as [ONNX](https://huggingface.co/sadda-speech/wav2vec2-espeak-ctc)) runs locally with
+  onnxruntime, its phonemes are summed into broad classes, and the text (kana from kuromoji readings,
+  or spelling) is fitted to them. Measured against ElevenLabs' own timing on 8 sentences: median
+  error 19 ms (one model frame is 20 ms); 79% (Japanese) and 91% (English) of characters within 50 ms.
+- The model (635 MB) is downloaded once from Hugging Face into `~/.cache/avatarscript/models`
+  (or `AVATARSCRIPT_MODEL_DIR`). Audio and text never leave the machine for alignment.
+- Speech that does not say the text — a provider reading extra words — is detected from the
+  alignment, requested once more, and otherwise reported as an error. (Gemini models read style
+  instructions aloud when they are written into the prompt, which is why only the text is sent.)
 
 An avatar can name its default voice per provider in `avatar.json`:
 `"voice": { "elevenlabs": { "voice": "<voice id>", "model": "eleven_v3" } }`.

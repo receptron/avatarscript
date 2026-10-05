@@ -4,7 +4,7 @@ import { z } from "zod";
 import { s16leToFloat } from "../audio.ts";
 import { check, parseJson } from "../json.ts";
 import { EMOTIONS, type Emotion } from "../script.ts";
-import type { ProviderDefinition, ProviderSettings, Speech, SpeechRequest } from "./types.ts";
+import type { NativeSpeech, ProviderDefinition, ProviderSettings, SpeechRequest } from "./types.ts";
 
 /** `options` for the elevenlabs provider. */
 const OptionsSchema = z.strictObject({
@@ -57,7 +57,7 @@ export function alignToText(text: string, alignment: Alignment, skip: number) {
   return timing;
 }
 
-function synthesizer(settings: ProviderSettings): (req: SpeechRequest) => Promise<Speech> {
+function synthesizer(settings: ProviderSettings): (req: SpeechRequest) => Promise<NativeSpeech> {
   const options = check(OptionsSchema, settings.options, "elevenlabs options");
   const { apiKey, model, voice } = settings;
   const v3 = model.startsWith("eleven_v3");
@@ -93,5 +93,6 @@ export const elevenLabsProvider: ProviderDefinition = {
   defaultModel: "eleven_v3",
   // "Sarah", one of ElevenLabs' premade multilingual voices
   defaultVoice: "EXAVITQu4vr4xnSDxMaL",
+  timing: "provider+refine",
   create: synthesizer,
 };

@@ -29,6 +29,8 @@ describe("Latin", () => {
     expect(shapes(latinVisemes([..."think"], even(5)))).toEqual(["TH", "ih", "nn", "kk"]);
     expect(shapes(latinVisemes([..."make"], even(4)))).toEqual(["PP", "aa", "kk"]);
     expect(shapes(latinVisemes([..."Café"], even(4)))).toEqual(["kk", "aa", "FF", "E"]);
+    // a final e is silent only after a vowel: "make" but not "the"
+    expect(shapes(latinVisemes([..."the"], even(3)))).toEqual(["TH", "E"]);
     // a final c is hard: nothing follows it to soften it
     expect(shapes(latinVisemes([..."music"], even(5)))).toEqual(["PP", "aa", "SS", "ih", "kk"]);
   });

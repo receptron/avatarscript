@@ -3,7 +3,7 @@ import { concat, silence, type Pcm } from "./audio.ts";
 import { textVisemes, type CharTime } from "./g2p/index.ts";
 import type { Score, ScoreCue } from "./score.ts";
 import type { Cue, Script } from "./script.ts";
-import { isSpoken, refineTiming } from "./timing.ts";
+import { isSpoken } from "./timing.ts";
 import type { TextToSpeech } from "./tts/types.ts";
 import { normalizeEvents, type VisemeEvent } from "./visemes.ts";
 
@@ -65,7 +65,8 @@ async function layOut(script: Script, tts: TextToSpeech, options: CompileOptions
     // the face changes slightly before the voice does
     tl.cues.push({ t: ms(Math.max(0, start - 0.15)), emotion: seg.emotion });
     const chars = Array.from(seg.text);
-    const times = refineTiming(chars, syn.timing, syn.samples, tl.sampleRate).map((c) => ({ start: start + c.start, end: start + c.end }));
+    // the engine returns final timing (corrected or aligned), whatever the provider
+    const times = syn.timing.map((c) => ({ start: start + c.start, end: start + c.end }));
     times.forEach((time, k) => tl.charTimes.set(seg.offset + k, time));
     tl.visemes.push(...(await textVisemes(chars, times)));
     const spoken = times.filter((_, k) => isSpoken(chars[k]));

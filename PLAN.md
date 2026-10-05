@@ -28,6 +28,15 @@ voice through `setVoiceLevel()`, and the page's `Math.random` is seeded. Engine 
 (`setMouth` with weights, `setGaze`, an emphasis beat) are still to do, as are the formal specs
 (milestone 1) and the LLM step (milestone 5).
 
+Update (same day): OpenAI (`gpt-4o-mini-tts`) and Gemini (`gemini-3.8-flash-tts`) are integrated
+through forced alignment (milestone 6), in Node with onnxruntime and an Apache-2.0 phoneme model.
+On 8 ElevenLabs sentences, aligned timing has a median error of 19 ms against ElevenLabs' own
+timing, versus 50–80 ms for evenly spread characters. Meta's MMS aligner was not used: its weights
+are CC-BY-NC. Timing correction against the audio now runs only for ElevenLabs; on aligned timing
+it made errors larger. Gemini models read prompt-embedded style instructions aloud and reject
+system instructions, so Gemini gets the text only; speech that does not match the text is detected
+from the alignment and requested again.
+
 Findings that changed the plan:
 
 - ElevenLabs `alignment` maps one-to-one to the text sent; with `eleven_v3` the emotion tag's

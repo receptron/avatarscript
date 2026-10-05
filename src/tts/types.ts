@@ -41,11 +41,27 @@ export interface ProviderSettings {
   options: Record<string, unknown>;
 }
 
+/** What a provider sends: audio at its own rate, with character timing if it has any. */
+export interface NativeSpeech {
+  samples: Float32Array;
+  sampleRate: number;
+  timing?: CharTime[];
+}
+
+/**
+ * Where a provider's character timing comes from:
+ * - "provider": its own, used as is
+ * - "provider+refine": its own, corrected against the audio (ElevenLabs v3 can start late)
+ * - "aligned": none; forced alignment of the text to the audio
+ */
+export type TimingSource = "provider" | "provider+refine" | "aligned";
+
 /** How a provider is plugged in. Its output is normalized to `Speech` by createTts(). */
 export interface ProviderDefinition {
   /** environment variable holding the API key; absent for a provider that needs none */
   apiKeyEnv?: string;
   defaultModel: string;
   defaultVoice: string;
-  create(settings: ProviderSettings): (request: SpeechRequest) => Promise<Speech>;
+  timing: TimingSource;
+  create(settings: ProviderSettings): (request: SpeechRequest) => Promise<NativeSpeech>;
 }

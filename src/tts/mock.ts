@@ -39,5 +39,6 @@ async function synthesize(req: SpeechRequest): Promise<Speech> {
 export const mockProvider: ProviderDefinition = {
   defaultModel: "buzz",
   defaultVoice: "buzz",
+  timing: "provider",
   create: () => synthesize,
 };

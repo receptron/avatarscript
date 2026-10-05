@@ -19,7 +19,8 @@ const USAGE = `Usage:
   avatarscript render  --avatar <dir> --score <name.score.json> -o <video.mp4> [options]
 
 Speech (make, compile):
-  --tts <provider>         speech provider: elevenlabs (needs ELEVENLABS_API_KEY) or mock (offline buzz)
+  --tts <provider>         elevenlabs, openai or gemini (keys: ELEVENLABS_API_KEY, OPENAI_API_KEY,
+                           GEMINI_API_KEY), or mock (offline buzz, no key)
   --voice <id>             the provider's voice (default: avatar.json, then a stock voice)
   --model <id>             the provider's model (default: avatar.json, then the provider's default)
   --lang <code>            language of the text (default: front matter, then detected)
