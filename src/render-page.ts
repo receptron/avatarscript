@@ -79,10 +79,15 @@ const RigViewSchema = z.looseObject({
   view: z.object({ padTop: z.number().optional(), padSide: z.number().optional() }).optional(),
 });
 
+/** Width ÷ height of the avatar's picture as the engine draws it (its image and margins). */
+export function avatarAspect(rig: unknown): number {
+  const r = check(RigViewSchema, rig, "rig");
+  return (r.image.width * (1 + 2 * (r.view?.padSide ?? 0))) / (r.image.height * (1 + (r.view?.padTop ?? 0)));
+}
+
 /** Where the avatar goes in the frame: its canvas is shaped like the engine's picture, so nothing is cropped. */
 export function avatarRect(rig: unknown, width: number, height: number, view: View): Rect {
-  const r = check(RigViewSchema, rig, "rig");
-  const aspect = (r.image.width * (1 + 2 * (r.view?.padSide ?? 0))) / (r.image.height * (1 + (r.view?.padTop ?? 0)));
+  const aspect = avatarAspect(rig);
   const h = Math.round((height * parseFloat(view.avatarScale)) / 100);
   const w = Math.round(h * aspect);
   return { x: Math.round((width * parseFloat(view.avatarX)) / 100 - w / 2), y: Math.round((height * parseFloat(view.avatarY)) / 100 - h), w, h };

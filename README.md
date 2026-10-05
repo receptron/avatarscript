@@ -64,6 +64,32 @@ await render({ avatar, score, audioPath: "out/hello.wav", out: "out/hello.mp4" }
 `compile` returns the timed score and the audio; `render` turns a score into a video.
 `ScoreSchema` and `AvatarManifestSchema` (zod) validate scores and manifests read from files.
 
+### Speech you already have (`compileTimeline`)
+
+A host that does its own text-to-speech (MulmoCast does) places existing audio files on a
+timeline; no TTS is called, and timing comes from forced alignment (needs `onnxruntime-node`):
+
+```js
+import { avatarAspect, compileTimeline, loadAvatar, render, toWav } from "avatarscript";
+
+const { score, audio } = await compileTimeline(
+  [
+    { text: "みなさん、こんにちは！", audio: "beat0.mp3", start: 1.0, emotion: "happy", motions: [{ motion: "nod", at: "こんにちは" }] },
+    { text: "スライドの上で説明します。", audio: "beat1.mp3", start: 4.2 },
+  ],
+  { lang: "ja", duration: 9, view: { background: "transparent" } },
+);
+await writeFile("voice.wav", toWav(audio)); // moves the head with the voice
+const avatar = await loadAvatar("path/to/avatar");
+const height = 446, width = Math.round(height * avatarAspect(avatar.rig) / 2) * 2;
+// one continuous, see-through avatar track, picture only, to overlay on another video
+await render({ avatar, score, audioPath: "voice.wav", audio: false, out: "avatar.webm", width, height });
+```
+
+`motions[].at` names words in the text: the motion starts where they are spoken.
+`avatarAspect` gives the avatar's width ÷ height, to size a track that holds nothing else.
+Decode the WebM with `-c:v libvpx-vp9` in ffmpeg to keep its alpha.
+
 ### Text-to-speech
 
 There is one API for every provider: `createTts({ provider, model?, voice?, apiKey?, options?, cacheDir? })`.

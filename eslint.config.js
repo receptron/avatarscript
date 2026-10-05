@@ -103,7 +103,7 @@ export default [
   {
     // These run tools the user installs and that are found on PATH by design — ffmpeg to encode
     // the video, git and npx to build — which have no portable absolute path.
-    files: ["src/render-encoder.ts", "scripts/build.ts"],
+    files: ["src/render-encoder.ts", "src/audio-file.ts", "scripts/build.ts"],
     rules: {
       "sonarjs/no-os-command-from-path": "off",
     },

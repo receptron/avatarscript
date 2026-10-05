@@ -11,19 +11,24 @@ export interface Encoder {
 }
 
 /** Video and audio codec arguments for the output file, or an explanation of why it cannot hold the video. */
-export function outputCodecs(out: string, alpha: boolean): string[] {
+export function outputCodecs(out: string, alpha: boolean, audio = true): string[] {
   const ext = extname(out).toLowerCase();
-  if (ext === ".webm") return ["-c:v", "libvpx-vp9", "-pix_fmt", alpha ? "yuva420p" : "yuv420p", "-b:v", "0", "-crf", "30", "-c:a", "libopus", "-b:a", "128k"];
-  if (ext === ".mov") return ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", alpha ? "yuva444p10le" : "yuv444p10le", "-c:a", "aac", "-b:a", "192k"];
+  const sound = (codec: string[]) => (audio ? codec : ["-an"]);
+  if (ext === ".webm")
+    return ["-c:v", "libvpx-vp9", "-pix_fmt", alpha ? "yuva420p" : "yuv420p", "-b:v", "0", "-crf", "30", ...sound(["-c:a", "libopus", "-b:a", "128k"])];
+  if (ext === ".mov")
+    return ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", alpha ? "yuva444p10le" : "yuv444p10le", ...sound(["-c:a", "aac", "-b:a", "192k"])];
   if (ext !== ".mp4") throw new Error(`cannot write ${ext || "a file without extension"}: use .mp4, .webm or .mov`);
   if (alpha) throw new Error("an MP4 (H.264) video cannot be transparent: write .webm (VP9) or .mov (ProRes 4444) for a see-through background");
-  return ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"];
+  return ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", ...sound(["-c:a", "aac", "-b:a", "192k"]), "-movflags", "+faststart"];
 }
 
-/** ffmpeg reading JPEG (opaque) or PNG (with alpha) frames on stdin. */
-export function startEncoder(out: string, audioPath: string, fps: number, alpha: boolean): Encoder {
-  const input = ["-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(fps), "-c:v", alpha ? "png" : "mjpeg", "-i", "-", "-i", audioPath];
-  const ffmpeg = spawn("ffmpeg", [...input, ...outputCodecs(out, alpha), "-shortest", out], { stdio: ["pipe", "inherit", "pipe"] });
+/** ffmpeg reading JPEG (opaque) or PNG (with alpha) frames on stdin, with the audio file muxed in unless it is null. */
+export function startEncoder(out: string, audioPath: string | null, fps: number, alpha: boolean): Encoder {
+  const input = ["-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(fps), "-c:v", alpha ? "png" : "mjpeg", "-i", "-"];
+  const audio = audioPath === null ? [] : ["-i", audioPath];
+  const args = [...input, ...audio, ...outputCodecs(out, alpha, audioPath !== null), ...(audioPath === null ? [] : ["-shortest"]), out];
+  const ffmpeg = spawn("ffmpeg", args, { stdio: ["pipe", "inherit", "pipe"] });
   let stderr = "";
   ffmpeg.stderr.on("data", (d: Buffer) => {
     stderr += d.toString();
