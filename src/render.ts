@@ -1,13 +1,11 @@
 // Score + avatar → video. The mesh engine runs in headless Chrome, advanced one frame at a
 // time; frames are piped to ffmpeg together with the audio.
 import { spawn } from 'node:child_process';
-import { readFile, stat } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
+import { readFile } from 'node:fs/promises';
 import puppeteer from 'puppeteer';
 import { fromWav, frameLevels } from './audio.ts';
 import type { Avatar } from './avatar.ts';
+import { loadEngine } from './engine.ts';
 import type { Score } from './score.ts';
 import { MESH_MOUTH, visemeAt, type MeshMouth } from './visemes.ts';
 
@@ -21,7 +19,7 @@ export interface RenderOptions {
   width?: number;
   height?: number;
   background?: string;
-  /** mesh-avatar-studio checkout that provides the engine */
+  /** mesh-avatar-studio checkout to bundle the engine from, instead of the bundled copy */
   engineRoot?: string;
   seed?: number;
   /** mouth shapes lead the sound slightly so the smoothed mouth arrives on time, seconds */
@@ -35,25 +33,6 @@ interface FramePlan {
   speaking: boolean;
   level: number;
   actions: (['emotion', string] | ['motion', string])[];
-}
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-
-export async function findEngineRoot(explicit?: string): Promise<string> {
-  const root = resolve(explicit ?? process.env.AVATARSCRIPT_MESH_ENGINE ?? resolve(repoRoot, '../mesh-avatar-studio'));
-  const entry = resolve(root, 'src/engine/index.ts');
-  if (!await stat(entry).then(() => true, () => false)) {
-    throw new Error(`mesh engine not found at ${entry}. Clone mesh-avatar-studio next to this repository, or pass --engine / set AVATARSCRIPT_MESH_ENGINE.`);
-  }
-  return root;
-}
-
-async function bundleEngine(root: string): Promise<string> {
-  const result = await build({
-    entryPoints: [resolve(root, 'src/engine/index.ts')],
-    bundle: true, write: false, format: 'iife', globalName: 'MeshAvatarEngine', target: 'es2022', logLevel: 'silent',
-  });
-  return result.outputFiles[0].text;
 }
 
 /** What the engine should do on each frame. */
@@ -83,7 +62,7 @@ export async function render(options: RenderOptions): Promise<void> {
   const audio = fromWav(await readFile(options.audioPath));
   const frames = Math.ceil(score.duration * fps);
   const plans = planFrames(score, frameLevels(audio, fps, frames), fps, mouthLead);
-  const engine = await bundleEngine(await findEngineRoot(options.engineRoot));
+  const engine = await loadEngine(options.engineRoot);
 
   const browser = await puppeteer.launch({ headless: true });
   const ffmpeg = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-',

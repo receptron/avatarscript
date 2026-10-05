@@ -18,22 +18,21 @@ Early, but working end to end: ElevenLabs speech, Japanese and English lip sync,
 motions, rendered to MP4 with the mesh engine. Not yet: the LLM step that writes scripts,
 gaze and emphasis rendering, other TTS providers.
 
-## Setup
+## Install
 
-Requires Node.js 22.18+ and ffmpeg. Clone
-[mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio) next to this repository
-(or pass `--engine <dir>`); its engine is bundled at render time and its sample avatar is used
-below.
+Requires Node.js 22.18+ and ffmpeg. The package includes the mesh avatar engine, so nothing
+else is needed to render. (It is not on npm yet; `npm pack` in this repository makes the
+package, or install from a checkout.)
 
 ```sh
-npm install
-echo "ELEVENLABS_API_KEY=..." > .env    # .env is git-ignored
+npm install avatarscript
+echo "ELEVENLABS_API_KEY=..." > .env    # read from the environment or ./.env
 ```
 
-## Make a video
+## Command line
 
 ```sh
-node src/cli.ts make --avatar ../mesh-avatar-studio/samples/miko-qipao \
+npx avatarscript make --avatar ../mesh-avatar-studio/samples/miko-qipao \
   --script examples/hello-ja.avs --tts elevenlabs -o out/hello-ja.mp4
 ```
 
@@ -41,11 +40,27 @@ This writes `out/hello-ja.wav`, `out/hello-ja.score.json` and `out/hello-ja.mp4`
 speech is cached per segment in `out/.tts-cache/`, so changing motions or one sentence does not
 request the whole script again. `--tts mock` runs the pipeline offline with a buzzing stand-in
 voice. The steps can also be run separately with `compile` and `render`; run
-`node src/cli.ts --help` for all options (voice, model, size, fps, background, seed).
+`npx avatarscript --help` for all options (voice, model, size, fps, background, seed).
 
 `--avatar` takes a mesh-avatar-studio project folder (`rig.json` + `built/`) or a folder with an
 `avatar.json` manifest. Only the text is sent to ElevenLabs; avatar images stay local, and the
 render page has no network access.
+
+## Library
+
+```js
+import { loadAvatar, parseScript, compile, render, elevenLabs, cached, toWav } from 'avatarscript';
+import { writeFile } from 'node:fs/promises';
+
+const avatar = await loadAvatar('path/to/avatar');
+const tts = cached(elevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY, voiceId: '...' }), 'out/.tts-cache');
+const { score, audio } = await compile(parseScript('[emotion:happy] Hello! <nod>'), tts, { lang: 'en', audioName: 'hello.wav' });
+await writeFile('out/hello.wav', toWav(audio));
+await render({ avatar, score, audioPath: 'out/hello.wav', out: 'out/hello.mp4' });
+```
+
+`compile` returns the timed score and the audio; `render` turns a score into a video. Other
+speech providers plug in through the `TtsAdapter` interface.
 
 ## Scripts
 
@@ -83,11 +98,22 @@ lang: ja
 
 ## Develop
 
+Clone [mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio) next to this
+repository: running from source (`node src/cli.ts …`) bundles the engine from that checkout
+(or from `--engine <dir>` / `AVATARSCRIPT_MESH_ENGINE`).
+
 ```sh
+npm install
 npm test
 npm run typecheck
+npm run build      # dist/, including the engine bundled from ../mesh-avatar-studio
 ```
+
+`npm run build` records the engine's source commit in `dist/engine/source.json`.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The bundled mesh avatar engine (`dist/engine/`) is from
+[mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio), MIT License,
+© Yuki Shindo; its license is included as `dist/engine/LICENSE.mesh-avatar-studio`. The
+Miko sample character in mesh-avatar-studio has its own usage terms and is not included.
