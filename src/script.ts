@@ -8,7 +8,12 @@ export const EMOTIONS = ["neutral", "happy", "sad", "angry", "surprised", "relax
 export type Emotion = (typeof EMOTIONS)[number];
 export const isEmotion = (v: string): v is Emotion => EMOTIONS.some((e) => e === v);
 
-export type Cue = { offset: number; motion: string } | { offset: number; emphasis: true } | { offset: number; gaze: string };
+/**
+ * A direction at a place in the text. `segment` is the segment it was written in: a cue between
+ * two segments ("hi[pause:1s]<nod>yo" or "hi<nod>[pause:1s]yo") has the same offset either way,
+ * and only the segment tells whether it goes with "hi" or with "yo".
+ */
+export type Cue = ({ motion: string } | { emphasis: true } | { gaze: string }) & { offset: number; segment: number };
 
 export interface Segment {
   /** spoken text sent to the TTS, trimmed */
@@ -140,7 +145,7 @@ function applyTagItem(s: State, item: string) {
     s.pause += parseDuration(value, s.line);
   } else if (key === "gaze") {
     if (!isGaze(value)) throw new ScriptError(`gaze must be camera, left, right, up, down or x,y, got "${value}"`, s.line);
-    s.cues.push({ offset: s.plain.length, gaze: value });
+    s.cues.push({ offset: s.plain.length, segment: s.segments.length, gaze: value });
   } else {
     throw new ScriptError(`unknown tag "${key}" (use emotion, pause, gaze)`, s.line);
   }
@@ -162,11 +167,11 @@ const MARKUP: Record<string, (s: State, at: number) => number> = {
   "<": (s, at) => {
     const { content, end } = enclosed(s, at, ">");
     if (!MOTION_NAME.test(content)) throw new ScriptError(`motion names are letters, digits, "-" and "_", got "<${content}>"`, s.line);
-    s.cues.push({ offset: s.plain.length, motion: content });
+    s.cues.push({ offset: s.plain.length, segment: s.segments.length, motion: content });
     return end + 1;
   },
   "*": (s, at) => {
-    if (!s.inEmphasis) s.cues.push({ offset: s.plain.length, emphasis: true });
+    if (!s.inEmphasis) s.cues.push({ offset: s.plain.length, segment: s.segments.length, emphasis: true });
     s.inEmphasis = !s.inEmphasis;
     return at + 1;
   },

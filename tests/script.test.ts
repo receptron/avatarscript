@@ -11,8 +11,8 @@ describe("parseScript", () => {
       { text: "本当に？", offset: 16, emotion: "sad", pauseBefore: 0.3 },
     ]);
     expect(s.cues).toEqual([
-      { offset: 7, motion: "nod" },
-      { offset: 16, emphasis: true },
+      { offset: 7, segment: 0, motion: "nod" },
+      { offset: 16, segment: 1, emphasis: true },
     ]);
   });
 
@@ -23,7 +23,8 @@ describe("parseScript", () => {
       ["Price [1] *now*", 0],
       ["ok", 1],
     ]);
-    expect(s.cues).toEqual([{ offset: 16, gaze: "left" }]);
+    // items in one tag apply left to right: the gaze comes before the pause, with "Price…"
+    expect(s.cues).toEqual([{ offset: 16, segment: 0, gaze: "left" }]);
   });
 
   it("reports mistakes with a line number", () => {

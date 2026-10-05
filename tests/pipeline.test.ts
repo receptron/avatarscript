@@ -49,6 +49,18 @@ describe("compile", () => {
     expect(score.visemes.at(-1)?.[1]).toBe("sil");
   });
 
+  it("puts a cue on the side of a pause it was written on", async () => {
+    const at = async (source: string) => {
+      const { score } = await compile(parseScript(source), createTts({ provider: "mock" }), { lang: "en" });
+      const nod = score.cues.find((c) => "motion" in c);
+      return { nod: nod?.t ?? NaN, first: score.speaking[0], second: score.speaking[1] };
+    };
+    const after = await at("hi[pause:1s]<nod>yo");
+    expect(after.nod).toBeCloseTo(after.second[0], 2);
+    const before = await at("hi<nod>[pause:1s]yo");
+    expect(before.nod).toBeCloseTo(before.first[1], 2);
+  });
+
   it("plans mouth, speech and actions per frame", async () => {
     const { score, audio } = await compile(parseScript("[emotion:happy] まま<nod>"), createTts({ provider: "mock" }), { lang: "ja" });
     const frames = Math.ceil(score.duration * 30);

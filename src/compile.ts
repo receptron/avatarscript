@@ -95,9 +95,9 @@ function scoreCue(cue: Cue, t: number): ScoreCue {
 }
 
 /**
- * When each script cue fires. A cue fires with the next spoken character of its segment; at the
- * end of a segment ("…です！<surprise>") it fires when that segment's speech ends, not in the
- * next segment. Between segments it fires with the next segment.
+ * When each script cue fires: with the next spoken character of the segment it was written in, or
+ * when that segment's speech ends if none follows ("…です！<surprise>"). A cue written after the
+ * last speech fires when the speech ends.
  */
 function resolveCues(script: Script, tl: Timeline): ScoreCue[] {
   const plain = Array.from(script.plain);
@@ -106,18 +106,14 @@ function resolveCues(script: Script, tl: Timeline): ScoreCue[] {
     if (!time) throw new Error(`no timing for character ${offset}`);
     return time.start;
   };
-  const timeAt = (offset: number): number => {
-    const k = script.segments.findIndex((s) => offset >= s.offset && offset <= s.offset + Array.from(s.text).length);
-    if (k >= 0) {
-      const seg = script.segments[k];
-      const last = seg.offset + Array.from(seg.text).length - 1;
-      for (let o = offset; o <= last; o++) if (isSpoken(plain[o])) return startOf(o);
-      return tl.speaking[k][1];
-    }
-    const next = script.segments.find((s) => s.offset > offset);
-    return next ? startOf(next.offset) : (tl.speaking.at(-1)?.[1] ?? 0);
+  const timeAt = (cue: Cue): number => {
+    if (cue.segment >= script.segments.length) return tl.speaking.at(-1)?.[1] ?? 0;
+    const seg = script.segments[cue.segment];
+    const last = seg.offset + Array.from(seg.text).length - 1;
+    for (let o = Math.max(cue.offset, seg.offset); o <= last; o++) if (isSpoken(plain[o])) return startOf(o);
+    return tl.speaking[cue.segment][1];
   };
-  return script.cues.map((cue) => scoreCue(cue, ms(timeAt(cue.offset))));
+  return script.cues.map((cue) => scoreCue(cue, ms(timeAt(cue))));
 }
 
 export async function compile(script: Script, tts: TextToSpeech, options: CompileOptions): Promise<{ score: Score; audio: Pcm }> {
