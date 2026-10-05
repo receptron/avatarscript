@@ -79,7 +79,11 @@ function readFrontMatter(source: string): { meta: Record<string, string>; body: 
     const colon = raw.indexOf(":");
     const key = raw.slice(0, colon).trim();
     if (colon < 0 || !KEY.test(key)) throw new ScriptError(`front matter lines must be "key: value"`, i + 2);
-    meta[key] = raw.slice(colon + 1).trim();
+    // a value may be quoted: subtitle-color: "#ffffff"
+    meta[key] = raw
+      .slice(colon + 1)
+      .trim()
+      .replace(/^(["'])(.*)\1$/u, "$2");
   });
   return { meta, body: lines.slice(end + 1).join("\n"), line: end + 2 };
 }

@@ -14,7 +14,7 @@ import { parseScript, plainScript, type Script } from "./script.ts";
 import { createTts, isTtsProvider, TTS_PROVIDERS, type TextToSpeech } from "./tts/index.ts";
 
 const USAGE = `Usage:
-  avatarscript make    --avatar <dir> --script <file.avs|file.txt> -o <video.mp4> [options]
+  avatarscript make    --avatar <dir> --script <file.avs|file.txt> -o <video.mp4|.webm|.mov> [options]
   avatarscript compile --avatar <dir> --script <file.avs|file.txt> -o <name.score.json> [options]
   avatarscript render  --avatar <dir> --score <name.score.json> -o <video.mp4> [options]
 
@@ -28,8 +28,14 @@ Speech (make, compile):
 Video (make, render):
   --fps <n>                frames per second (default 30)
   --size <WxH>             video size (default 1280x720)
-  --background <color>     CSS colour behind the avatar (default #e9edf2)
+  --background <bg>        colour (CSS; "transparent" needs .webm or .mov) or image file behind the avatar
+                           (default: the script's background, then #e9edf2)
+  --avatar-x <n%>          horizontal centre of the avatar (default 50%)
+  --avatar-y <n%>          bottom edge of the avatar (default 100%)
+  --avatar-scale <n%>      height of the avatar, share of the video height (default 100%)
   --seed <n>               randomness of blinks and idle motion (default 1)
+  --subtitles              draw subtitles (style from the script's subtitle-* front matter)
+  --no-subtitles           do not draw subtitles, even if the script turns them on
   --engine <dir>           mesh-avatar-studio checkout (default ../mesh-avatar-studio)
 
 API keys are read from the environment or a .env file.`;
@@ -44,6 +50,7 @@ for (const file of [resolve(".env"), join(repoRoot, ".env")]) {
 
 const { positionals, values: args } = parseArgs({
   allowPositionals: true,
+  allowNegative: true,
   options: {
     avatar: { type: "string" },
     script: { type: "string" },
@@ -58,6 +65,10 @@ const { positionals, values: args } = parseArgs({
     background: { type: "string" },
     seed: { type: "string" },
     engine: { type: "string" },
+    subtitles: { type: "boolean" },
+    "avatar-x": { type: "string" },
+    "avatar-y": { type: "string" },
+    "avatar-scale": { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -97,7 +108,9 @@ async function compileStep(avatar: Avatar, scorePath: string): Promise<Score> {
   const audioPath = scorePath.replace(/(\.score)?\.json$/, "") + ".wav";
   const { score, audio } = await compile(script, tts, {
     lang,
+    subtitles: args.subtitles,
     scriptName: relative(dirname(scorePath), scriptPath),
+    baseDir: dirname(resolve(scriptPath)),
     audioName: basename(audioPath),
     onSegment: (i, n, text) => console.log(`speech ${i + 1}/${n}: ${text.length > 40 ? text.slice(0, 40) + "…" : text}`),
   });
@@ -122,8 +135,14 @@ async function renderStep(avatar: Avatar, score: Score, scorePath: string, out: 
     width: Number(size[1]),
     height: Number(size[2]),
     seed: num("seed", 1),
-    background: args.background,
+    view: {
+      ...(args.background ? { background: args.background } : {}),
+      ...(args["avatar-x"] ? { avatarX: args["avatar-x"] } : {}),
+      ...(args["avatar-y"] ? { avatarY: args["avatar-y"] } : {}),
+      ...(args["avatar-scale"] ? { avatarScale: args["avatar-scale"] } : {}),
+    },
     engineRoot: args.engine,
+    subtitles: args.subtitles,
     onProgress: (f, n) => {
       const pct = Math.floor((f / n) * 10) * 10;
       if (pct !== last) {

@@ -121,6 +121,49 @@ lang: ja
 | `\[ \< \* \\` | literal characters |
 | front matter | `lang` (default: detected from the text) |
 
+## Subtitles, background and placement
+
+All of these go in the script's front matter; CLI flags (`--subtitles`, `--no-subtitles`,
+`--background`, `--avatar-x`, `--avatar-y`, `--avatar-scale`) and the library's `compile` /
+`render` options (`subtitles`, `view`) override them.
+
+```text
+---
+lang: ja
+subtitles: on
+subtitle-font: Hiragino Mincho ProN, Noto Serif CJK JP, serif
+subtitle-size: 6%
+subtitle-color: "#fff8e7"
+subtitle-outline: "#5a2a14"
+subtitle-background: rgba(0, 0, 0, 0.35)
+subtitle-position: bottom
+background: stage.png
+avatar-x: 68%
+avatar-scale: 85%
+---
+```
+
+| Key | Meaning | Default |
+|---|---|---|
+| `subtitles` | `on` or `off` | `off` |
+| `subtitle-font` | CSS font family list, or a font file (`.ttf`, `.otf`, `.woff`, `.woff2`) | Hiragino / Noto CJK / Yu Gothic, sans-serif |
+| `subtitle-size` | `40px`, or a share of the video height (`6%`) | `5.5%` |
+| `subtitle-weight` | `normal` or `bold` | `bold` |
+| `subtitle-color`, `subtitle-outline`, `subtitle-background` | CSS colours; `none` turns the outline or background off | white, black, `none` |
+| `subtitle-position` | `bottom`, `top` or `middle` | `bottom` |
+| `subtitle-margin` | distance from the edge, `px` or `%` of the height | `6%` |
+| `subtitle-max-width` | share of the video width; longer lines wrap into lines of even length | `90%` |
+| `background` | a CSS colour, `transparent` (or any colour with alpha), or an image file (`.png`, `.jpg`, `.webp`, relative to the script; it covers the frame) | `#e9edf2` |
+| `avatar-x` | horizontal centre of the avatar, % of the width | `50%` |
+| `avatar-y` | bottom edge of the avatar, % of the height | `100%` |
+| `avatar-scale` | height of the avatar, % of the height | `100%` |
+
+Subtitles show one sentence at a time, timed by the speech; scores always carry these
+`captions`, even when they are not drawn. A see-through background needs an output that keeps
+alpha: `-o video.webm` (VP9) or `-o video.mov` (ProRes 4444); MP4 (H.264) is refused. Fonts named by
+family must be installed where the video is rendered (Linux usually needs Noto CJK for Japanese);
+a font file always works.
+
 ## How lip sync works
 
 1. Each segment is synthesized with ElevenLabs `/with-timestamps` (default model `eleven_v3`,

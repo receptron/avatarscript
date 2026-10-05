@@ -59,6 +59,9 @@ describe("compile", () => {
       ["motion", "nod"],
     ]);
     expect(new Set(plans.filter((p) => p.speaking).map((p) => p.mouth))).toEqual(new Set(["n", "a"]));
-    expect(plans[0]).toMatchObject({ mouth: null, speaking: false, level: 0 });
+    expect(plans[0]).toMatchObject({ mouth: null, speaking: false, level: 0, caption: null });
+    // captions are planned only when subtitles are drawn
+    const withCaptions = planFrames(score, frameLevels(audio, 30, frames), 30, 0, true);
+    expect(new Set(withCaptions.map((p) => p.caption))).toEqual(new Set([null, "まま"]));
   });
 });
