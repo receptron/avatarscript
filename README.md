@@ -57,7 +57,7 @@ lang: ja
 ---
 [emotion:happy] みなさん、こんにちは！<nod> ミコです。
 [pause:300ms]
-[emotion:surprised] 文章を書くだけで、私がしゃべるんです！<surprise>
+[emotion:surprised] テキストを書くだけで、私がしゃべるんです！<surprise>
 ```
 
 | Syntax | Meaning |
