@@ -51,19 +51,35 @@ render page has no network access.
 [`examples/make-video.ts`](examples/make-video.ts) is a complete, runnable example. In short:
 
 ```js
-import { loadAvatar, parseScript, compile, render, elevenLabs, cached, toWav } from "avatarscript";
+import { loadAvatar, parseScript, compile, render, createTts, toWav } from "avatarscript";
 import { writeFile } from "node:fs/promises";
 
 const avatar = await loadAvatar("path/to/avatar");
-const tts = cached(elevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY, voiceId: "..." }), "out/.tts-cache");
+const tts = createTts({ provider: "elevenlabs", cacheDir: "out/.tts-cache" }); // key from ELEVENLABS_API_KEY
 const { score, audio } = await compile(parseScript("[emotion:happy] Hello! <nod>"), tts, { lang: "en", audioName: "hello.wav" });
 await writeFile("out/hello.wav", toWav(audio));
 await render({ avatar, score, audioPath: "out/hello.wav", out: "out/hello.mp4" });
 ```
 
-`compile` returns the timed score and the audio; `render` turns a score into a video. Other
-speech providers plug in through the `TtsAdapter` interface. `ScoreSchema` and
-`AvatarManifestSchema` (zod) validate scores and manifests read from files.
+`compile` returns the timed score and the audio; `render` turns a score into a video.
+`ScoreSchema` and `AvatarManifestSchema` (zod) validate scores and manifests read from files.
+
+### Text-to-speech
+
+There is one API for every provider: `createTts({ provider, model?, voice?, apiKey?, options?, cacheDir? })`.
+The provider is a parameter, and whatever it sends natively is normalized, so application code
+does not change when the provider or model does:
+
+- `synthesize(request)` always returns `Speech`: mono samples at `SPEECH_SAMPLE_RATE` (24 kHz) and
+  one `{ start, end }` per character of the text. Other sample rates are resampled; timing that does
+  not match the text is an error.
+- `model` and `voice` default to the provider's; `apiKey` defaults to its environment variable.
+  Provider-specific settings go in `options` and are checked by that provider.
+- Providers today: `elevenlabs` (options: `emotionTags`, `seed`) and `mock`, an offline buzz with
+  exact timing for tests. More need per-character timing or, later, forced alignment (see PLAN.md).
+
+An avatar can name its default voice per provider in `avatar.json`:
+`"voice": { "elevenlabs": { "voice": "<voice id>", "model": "eleven_v3" } }`.
 
 ## Scripts
 

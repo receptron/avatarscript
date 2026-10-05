@@ -11,10 +11,7 @@ import { render } from "./render.ts";
 import { parseJson } from "./json.ts";
 import { ScoreSchema, type Score } from "./score.ts";
 import { parseScript, plainScript, type Script } from "./script.ts";
-import { cached } from "./tts/cache.ts";
-import { elevenLabs } from "./tts/elevenlabs.ts";
-import { mockTts } from "./tts/mock.ts";
-import type { TtsAdapter } from "./tts/types.ts";
+import { createTts, isTtsProvider, TTS_PROVIDERS, type TextToSpeech } from "./tts/index.ts";
 
 const USAGE = `Usage:
   avatarscript make    --avatar <dir> --script <file.avs|file.txt> -o <video.mp4> [options]
@@ -22,9 +19,9 @@ const USAGE = `Usage:
   avatarscript render  --avatar <dir> --score <name.score.json> -o <video.mp4> [options]
 
 Speech (make, compile):
-  --tts <elevenlabs|mock>  speech provider (required; mock needs no key and makes a buzz)
-  --voice <id>             ElevenLabs voice id (default: avatar.json, ELEVENLABS_VOICE_ID, then Sarah)
-  --model <id>             ElevenLabs model (default: eleven_v3)
+  --tts <provider>         speech provider: elevenlabs (needs ELEVENLABS_API_KEY) or mock (offline buzz)
+  --voice <id>             the provider's voice (default: avatar.json, then a stock voice)
+  --model <id>             the provider's model (default: avatar.json, then the provider's default)
   --lang <code>            language of the text (default: front matter, then detected)
 
 Video (make, render):
@@ -34,7 +31,7 @@ Video (make, render):
   --seed <n>               randomness of blinks and idle motion (default 1)
   --engine <dir>           mesh-avatar-studio checkout (default ../mesh-avatar-studio)
 
-ELEVENLABS_API_KEY is read from the environment or a .env file.`;
+API keys are read from the environment or a .env file.`;
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 for (const file of [resolve(".env"), join(repoRoot, ".env")]) {
@@ -78,16 +75,12 @@ const num = (name: "fps" | "seed", fallback: number) => {
   return n;
 };
 
-function ttsAdapter(avatar: Avatar): TtsAdapter {
+function textToSpeech(avatar: Avatar, cacheDir: string): TextToSpeech {
   const provider = need("tts");
-  if (provider === "mock") return mockTts();
-  if (provider !== "elevenlabs") throw new Error(`unknown --tts "${provider}" (use elevenlabs or mock)`);
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) throw new Error("ELEVENLABS_API_KEY is not set (environment or .env)");
-  const config = avatar.manifest.voice?.elevenlabs ?? {};
-  // "Sarah", one of ElevenLabs' premade multilingual voices
-  const voiceId = args.voice ?? config.voiceId ?? process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL";
-  return elevenLabs({ apiKey, voiceId, model: args.model ?? config.model });
+  if (!isTtsProvider(provider)) throw new Error(`unknown --tts "${provider}" (use ${TTS_PROVIDERS.join(" or ")})`);
+  // avatar.json can name a default voice and model per provider
+  const preset = avatar.manifest.voice?.[provider] ?? {};
+  return createTts({ provider, model: args.model ?? preset.model, voice: args.voice ?? preset.voice, cacheDir });
 }
 
 async function loadScript(path: string): Promise<Script> {
@@ -99,7 +92,7 @@ async function compileStep(avatar: Avatar, scorePath: string): Promise<Score> {
   const scriptPath = need("script");
   const script = await loadScript(scriptPath);
   const lang = args.lang ?? script.meta.lang ?? detectLang(script.plain);
-  const tts = cached(ttsAdapter(avatar), join(dirname(scorePath), ".tts-cache"));
+  const tts = textToSpeech(avatar, join(dirname(scorePath), ".tts-cache"));
   const audioPath = scorePath.replace(/(\.score)?\.json$/, "") + ".wav";
   const { score, audio } = await compile(script, tts, {
     lang,

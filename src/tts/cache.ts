@@ -1,20 +1,20 @@
-// Caches synthesized segments on disk, keyed by everything that changes the audio, so editing
-// motions or one sentence does not request the whole script again.
+// Caches synthesized speech on disk, keyed by everything that changes it, so editing motions or
+// one sentence does not request the whole script again.
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { errorCode, parseJson } from "../json.ts";
-import type { Synthesis, SynthesisRequest, TtsAdapter } from "./types.ts";
+import type { Speech, SpeechRequest, TextToSpeech } from "./types.ts";
 
-/** A cache file: the synthesis with its samples as base64 float32 (plus the request, for people). */
+/** A cache file: the speech with its samples as base64 float32 (plus the request, for people). */
 const EntrySchema = z.object({
   samples: z.string(),
   sampleRate: z.number(),
   timing: z.array(z.object({ start: z.number(), end: z.number() })),
 });
 
-async function readEntry(file: string): Promise<Synthesis | null> {
+async function readEntry(file: string): Promise<Speech | null> {
   let text: string;
   try {
     text = await readFile(file, "utf8");
@@ -28,22 +28,23 @@ async function readEntry(file: string): Promise<Synthesis | null> {
   return { ...entry, samples: new Float32Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength)) };
 }
 
-export function cached(adapter: TtsAdapter, dir: string): TtsAdapter {
+/** The engine with a disk cache in front. The API key is not part of the key: it does not change the audio. */
+export function withCache(engine: TextToSpeech, dir: string, options: Record<string, unknown>): TextToSpeech {
   return {
-    ...adapter,
-    async synthesize(req: SynthesisRequest): Promise<Synthesis> {
-      const key = createHash("sha256")
-        .update(JSON.stringify({ ...adapter.cacheKey, req }))
-        .digest("hex")
-        .slice(0, 32);
+    provider: engine.provider,
+    model: engine.model,
+    voice: engine.voice,
+    async synthesize(request: SpeechRequest): Promise<Speech> {
+      const identity = { provider: engine.provider, model: engine.model, voice: engine.voice, options, request };
+      const key = createHash("sha256").update(JSON.stringify(identity)).digest("hex").slice(0, 32);
       const file = join(dir, `${key}.json`);
       const hit = await readEntry(file);
       if (hit) return hit;
-      const result = await adapter.synthesize(req);
+      const speech = await engine.synthesize(request);
       await mkdir(dir, { recursive: true });
-      const samples = Buffer.from(result.samples.buffer, result.samples.byteOffset, result.samples.byteLength).toString("base64");
-      await writeFile(file, JSON.stringify({ ...result, samples, request: req }));
-      return result;
+      const samples = Buffer.from(speech.samples.buffer, speech.samples.byteOffset, speech.samples.byteLength).toString("base64");
+      await writeFile(file, JSON.stringify({ ...speech, samples, request }));
+      return speech;
     },
   };
 }

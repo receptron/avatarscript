@@ -29,10 +29,10 @@ node_modules/.bin/avatarscript make --avatar "$AVATAR" --script story.avs --tts 
   --size 640x360 -o out/cli.mp4
 
 cat > lib.mjs <<EOF
-import { loadAvatar, parseScript, compile, render, mockTts, toWav } from 'avatarscript';
+import { loadAvatar, parseScript, compile, render, createTts, toWav } from 'avatarscript';
 import { writeFile } from 'node:fs/promises';
 const avatar = await loadAvatar(process.argv[2]);
-const { score, audio } = await compile(parseScript('[emotion:surprised] Library check. <surprise>'), mockTts(), { lang: 'en', audioName: 'lib.wav' });
+const { score, audio } = await compile(parseScript('[emotion:surprised] Library check. <surprise>'), createTts({ provider: 'mock' }), { lang: 'en', audioName: 'lib.wav' });
 await writeFile('out/lib.wav', toWav(audio));
 await writeFile('out/lib.score.json', JSON.stringify(score));
 await render({ avatar, score, audioPath: 'out/lib.wav', out: 'out/lib.mp4', width: 640, height: 360 });

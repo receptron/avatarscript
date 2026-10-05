@@ -3,7 +3,7 @@ import { fromWav, toWav, frameLevels } from "../src/audio.ts";
 import { compile } from "../src/compile.ts";
 import { planFrames } from "../src/render.ts";
 import { parseScript } from "../src/script.ts";
-import { mockTts } from "../src/tts/mock.ts";
+import { createTts } from "../src/tts/index.ts";
 import { alignToText } from "../src/tts/elevenlabs.ts";
 
 describe("audio", () => {
@@ -35,7 +35,7 @@ describe("ElevenLabs timing", () => {
 describe("compile", () => {
   it("places segments, pauses and cues on one timeline", async () => {
     const script = parseScript("[emotion:happy] はい！<nod> [pause:500ms] [emotion:sad] いいえ。<sigh>");
-    const { score, audio } = await compile(script, mockTts(), { lang: "ja", leadIn: 0.4, tail: 0.8 });
+    const { score, audio } = await compile(script, createTts({ provider: "mock" }), { lang: "ja", leadIn: 0.4, tail: 0.8 });
     expect(score.speaking).toHaveLength(2);
     const [[, end1], [start2]] = score.speaking;
     expect(start2 - end1).toBeGreaterThan(0.5);
@@ -50,7 +50,7 @@ describe("compile", () => {
   });
 
   it("plans mouth, speech and actions per frame", async () => {
-    const { score, audio } = await compile(parseScript("[emotion:happy] まま<nod>"), mockTts(), { lang: "ja" });
+    const { score, audio } = await compile(parseScript("[emotion:happy] まま<nod>"), createTts({ provider: "mock" }), { lang: "ja" });
     const frames = Math.ceil(score.duration * 30);
     const plans = planFrames(score, frameLevels(audio, 30, frames), 30, 0);
     expect(plans).toHaveLength(frames);

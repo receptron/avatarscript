@@ -223,26 +223,21 @@ also be written by hand, which is how the renderer is tested before TTS exists.
 
 ## 4. TTS and timing
 
-### Adapter interface
+### One API, providers as a parameter
 
 ```ts
-interface TtsAdapter {
-  id: string;                         // 'elevenlabs' in v1
-  caps: {
-    timing: 'viseme' | 'char' | 'none';
-    style: 'tags' | 'instructions' | 'styleId' | 'none';
-    maxChars: number;
-  };
-  synthesize(segment: {
-    text: string;
-    lang: string;
-    voice: string;
-    emotion: string;
-    context?: { prev?: string; next?: string };
-  }): Promise<{ pcm: Float32Array; sampleRate: number; timing?: CharTiming[] }>;
-}
-interface CharTiming { index: number; start: number; end: number } // index into segment text
+const tts = createTts({ provider: "elevenlabs", model?, voice?, apiKey?, options?, cacheDir? });
+const speech = await tts.synthesize({ text, lang, emotion, previousText?, nextText? });
+// speech: { samples: Float32Array (mono, 24 kHz), sampleRate: 24000, timing: { start, end }[] per character }
 ```
+
+- Application code never names a provider-specific function; the provider is a value in the
+  config (CLI: `--tts`), and provider-specific settings go in `options`, validated by the provider.
+- Every provider's output is normalized to `Speech` by the generic layer: resampled to 24 kHz,
+  timing checked against the text and kept inside the audio. Switching provider or model does not
+  change what the application receives.
+- Providers live in one `Record<TtsProvider, ProviderDefinition>`: API key variable, default model
+  and voice, and a function from settings to native speech.
 
 ### v1 provider: ElevenLabs
 

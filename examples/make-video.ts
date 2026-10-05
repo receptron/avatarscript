@@ -3,10 +3,10 @@
 //   npm run build                                          # once: the package entry is dist/
 //   node --env-file-if-exists=.env examples/make-video.ts  # needs ELEVENLABS_API_KEY and ffmpeg
 //
-// Writes out/hello.wav, out/hello.score.json and out/hello.mp4. To try the pipeline without a key,
-// replace the provider with mockTts() — it makes a buzzing stand-in voice, not speech.
+// Writes out/hello.wav, out/hello.score.json and out/hello.mp4. The speech provider is a parameter:
+// the rest of the code does not change with it. ("mock" runs without a key but makes a buzz, not speech.)
 import { mkdir, writeFile } from "node:fs/promises";
-import { cached, compile, detectLang, elevenLabs, loadAvatar, parseScript, render, toWav } from "avatarscript";
+import { compile, createTts, detectLang, loadAvatar, parseScript, render, toWav } from "avatarscript";
 
 // 1. The avatar: a mesh-avatar-studio project folder (rig.json + built/) or an avatar.json package.
 const avatar = await loadAvatar("../mesh-avatar-studio/samples/miko-qipao");
@@ -18,10 +18,9 @@ const script = parseScript(`
 [emotion:surprised] You just write the words, and I speak them! <surprise>
 `);
 
-// 3. The speech provider: ElevenLabs returns per-character timing for lip sync.
-const apiKey = process.env.ELEVENLABS_API_KEY;
-if (!apiKey) throw new Error("Set ELEVENLABS_API_KEY (environment or .env)");
-const tts = cached(elevenLabs({ apiKey, voiceId: "EXAVITQu4vr4xnSDxMaL", model: "eleven_v3" }), "out/.tts-cache");
+// 3. Text-to-speech. The API key comes from the provider's environment variable (here
+// ELEVENLABS_API_KEY); without it createTts() throws. model and voice are optional.
+const tts = createTts({ provider: "elevenlabs", model: "eleven_v3", cacheDir: "out/.tts-cache" });
 
 // 4. Compile: speech + timing → a timed score and the audio.
 const { score, audio } = await compile(script, tts, {

@@ -46,6 +46,18 @@ describe("refineTiming", () => {
     for (let i = 1; i < out.length; i++) expect(out[i].start).toBeGreaterThanOrEqual(out[i - 1].start);
   });
 
+  it("does not take a click after the speech for more speech", () => {
+    const withClick = voiced(
+      [
+        [0.1, 0.5],
+        [0.7, 1.1],
+        [1.4, 1.42],
+      ],
+      1.6,
+    );
+    expect(silences(withClick, RATE)?.offset).toBeCloseTo(1.1, 2);
+  });
+
   it("leaves timing alone for silent audio", () => {
     const timing = [{ start: 0, end: 0.1 }];
     expect(refineTiming(["a"], timing, new Float32Array(800), RATE)).toBe(timing);

@@ -12,7 +12,8 @@ export const AvatarManifestSchema = z.object({
   /** folder the asset paths are relative to, relative to the manifest */
   root: z.string().optional(),
   assets: z.object({ rig: z.string(), layers: z.string(), sprites: z.string().optional() }),
-  voice: z.object({ elevenlabs: z.object({ voiceId: z.string().optional(), model: z.string().optional() }).optional() }).optional(),
+  /** default voice and model per text-to-speech provider: { "elevenlabs": { "voice": "…", "model": "…" } } */
+  voice: z.record(z.string(), z.object({ voice: z.string().optional(), model: z.string().optional() })).optional(),
   license: z.object({ attribution: z.string().optional(), terms: z.string().optional() }).optional(),
 });
 export type AvatarManifest = z.infer<typeof AvatarManifestSchema>;

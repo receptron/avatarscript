@@ -13,6 +13,20 @@ export function s16leToFloat(buf: Uint8Array): Float32Array {
   return out;
 }
 
+/** Linear-interpolation resampling: enough for speech going to lip sync and AAC. */
+export function resample(samples: Float32Array, from: number, to: number): Float32Array {
+  if (from === to) return samples;
+  const out = new Float32Array(Math.round((samples.length * to) / from));
+  for (let i = 0; i < out.length; i++) {
+    const x = (i * from) / to;
+    const k = Math.floor(x);
+    const a = samples[k] ?? 0,
+      b = samples[k + 1] ?? a;
+    out[i] = a + (b - a) * (x - k);
+  }
+  return out;
+}
+
 export function silence(seconds: number, sampleRate: number): Float32Array {
   return new Float32Array(Math.max(0, Math.round(seconds * sampleRate)));
 }

@@ -7,8 +7,24 @@ import type { CharTime } from "./g2p/types.ts";
 const FRAME = 0.01; // analysis step, seconds
 const MIN_GAP = 0.08; // shortest silence that counts as a pause
 const SEARCH = 0.35; // how far a pause may be from where the provider put it
+const MIN_VOICE = 0.04; // shorter bursts (clicks, breath noise) are not speech
 
 export const isSpoken = (c: string) => !/[\s\p{P}\p{S}]/u.test(c);
+
+/** Clears loud runs shorter than MIN_VOICE: a click after the last word must not count as speech. */
+function dropBursts(loud: boolean[]): boolean[] {
+  const min = Math.round(MIN_VOICE / FRAME);
+  const out = [...loud];
+  let start = -1;
+  for (let i = 0; i <= out.length; i++) {
+    if (out[i] && start < 0) start = i;
+    if (!out[i] && start >= 0) {
+      if (i - start < min) out.fill(false, start, i);
+      start = -1;
+    }
+  }
+  return out;
+}
 
 /** Silent stretches of the audio, [start, end] in seconds (including the edges). */
 export function silences(samples: Float32Array, sampleRate: number): { gaps: [number, number][]; onset: number; offset: number } | null {
@@ -22,7 +38,7 @@ export function silences(samples: Float32Array, sampleRate: number): { gaps: [nu
   }
   const peak = Math.max(...db);
   const threshold = Math.max(-50, peak - 35);
-  const loud = Array.from(db, (v) => v > threshold);
+  const loud = dropBursts(Array.from(db, (v) => v > threshold));
   const first = loud.indexOf(true),
     last = loud.lastIndexOf(true);
   if (first < 0) return null;

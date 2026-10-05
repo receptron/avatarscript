@@ -4,7 +4,7 @@ import { textVisemes, type CharTime } from "./g2p/index.ts";
 import type { Score, ScoreCue } from "./score.ts";
 import type { Cue, Script } from "./script.ts";
 import { isSpoken, refineTiming } from "./timing.ts";
-import type { TtsAdapter } from "./tts/types.ts";
+import type { TextToSpeech } from "./tts/types.ts";
 import { normalizeEvents, type VisemeEvent } from "./visemes.ts";
 
 export interface CompileOptions {
@@ -46,7 +46,7 @@ function pushSilence(tl: Timeline, seconds: number) {
   tl.t += samples.length / tl.sampleRate;
 }
 
-async function layOut(script: Script, tts: TtsAdapter, options: CompileOptions): Promise<Timeline> {
+async function layOut(script: Script, tts: TextToSpeech, options: CompileOptions): Promise<Timeline> {
   const { lang, leadIn = 0.4, tail = 0.8, gap = 0.1 } = options;
   const tl: Timeline = { sampleRate: 0, parts: [], t: 0, visemes: [], speaking: [], cues: [], charTimes: new Map() };
   for (const [i, seg] of script.segments.entries()) {
@@ -109,7 +109,7 @@ function resolveCues(script: Script, tl: Timeline): ScoreCue[] {
   return script.cues.map((cue) => scoreCue(cue, ms(timeAt(cue.offset))));
 }
 
-export async function compile(script: Script, tts: TtsAdapter, options: CompileOptions): Promise<{ score: Score; audio: Pcm }> {
+export async function compile(script: Script, tts: TextToSpeech, options: CompileOptions): Promise<{ score: Score; audio: Pcm }> {
   if (!script.segments.length) throw new Error("the script has nothing to say");
   const tl = await layOut(script, tts, options);
   const cues = [...tl.cues, ...resolveCues(script, tl)].sort((a, b) => a.t - b.t);
@@ -121,7 +121,7 @@ export async function compile(script: Script, tts: TtsAdapter, options: CompileO
     visemes: normalizeEvents(tl.visemes),
     speaking: tl.speaking.map(([a, b]) => [ms(a), ms(b)]),
     cues,
-    provenance: { tts: tts.cacheKey, ...(options.scriptName ? { script: options.scriptName } : {}) },
+    provenance: { tts: { provider: tts.provider, model: tts.model, voice: tts.voice }, ...(options.scriptName ? { script: options.scriptName } : {}) },
   };
   return { score, audio: { samples: concat(tl.parts), sampleRate: tl.sampleRate } };
 }
