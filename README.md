@@ -107,7 +107,11 @@ npm install
 npm test
 npm run typecheck
 npm run build      # dist/, including the engine bundled from ../mesh-avatar-studio
+scripts/smoke.sh ../mesh-avatar-studio/samples/miko-qipao   # pack, install, render (as CI does)
 ```
+
+CI (`.github/workflows/ci.yml`) runs the typecheck and build, the tests on Ubuntu and macOS,
+and the package smoke above, against a pinned mesh-avatar-studio commit.
 
 `npm run build` records the engine's source commit in `dist/engine/source.json`.
 

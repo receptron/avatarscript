@@ -7,8 +7,9 @@ Working notes for AI coding agents in this repo. What the project is and how to 
 
 - **Package manager: npm** (package-lock.json). Add dependencies with `npm install` /
   `npm install --save-dev`; don't hand-edit the dependency lists in package.json.
-- Run after changes: `npm run typecheck`, `npm test`, and `npm run build` when the packaging or
-  the engine bundle is affected.
+- Run after changes: `npm run typecheck`, `npm test`, and — when packaging, the engine bundle or
+  rendering is affected — `scripts/smoke.sh ../mesh-avatar-studio/samples/miko-qipao`, the same
+  pack-install-render check CI runs (`.github/workflows/ci.yml`).
 - **Type-checking covers the whole repo only if the tsconfig says so.** `tsconfig.json` includes
   `src`, `tests` and `scripts`. A new top-level folder of `.ts` files must be added there, or
   nothing type-checks it and nothing tells you.
