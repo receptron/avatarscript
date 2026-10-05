@@ -22,6 +22,9 @@ concurrency:
 # an upstream change cannot silently change what CI builds and ships; move it on purpose, in a
 # commit of its own, after rendering the examples with the new engine.
 env:
+  # onnxruntime-node's install script fetches its CUDA binaries from NuGet on Linux x64 (hundreds of
+  # MB, per install). Alignment runs on the CPU binaries the package already contains.
+  ONNXRUNTIME_NODE_INSTALL: skip
   MESH_AVATAR_STUDIO_REF: 8713e85a00e50f5cdf8fe33294b961d1d6506fc9
 
 jobs:
