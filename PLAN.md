@@ -19,6 +19,26 @@ The first runtime is the mesh avatar engine from
 [mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio), which already turns a single illustration into
 a 2D mesh avatar with blinking, head motion, expressions and vowel mouths.
 
+## Progress (2026-10-05)
+
+Working end to end on the Miko sample: `.avs` scripts → ElevenLabs (`eleven_v3`) → timing
+corrected against the audio → visemes (Japanese and English) → seeded render → MP4.
+It runs without engine changes so far: the mouth uses `holdMouth()`, the head follows the
+voice through `setVoiceLevel()`, and the page's `Math.random` is seeded. Engine changes 2–4 below
+(`setMouth` with weights, `setGaze`, an emphasis beat) are still to do, as are the formal specs
+(milestone 1) and the LLM step (milestone 5).
+
+Findings that changed the plan:
+
+- ElevenLabs `alignment` maps one-to-one to the text sent; with `eleven_v3` the emotion tag's
+  characters are included and are skipped by length.
+- `eleven_v3` timing can start 0.1–0.4 s late on segments with an emotion tag. Timing is
+  therefore always corrected against the audio (voice onset/offset and pauses at
+  punctuation). This step will also serve providers whose timing is rough.
+- Without `language_code`, `eleven_multilingual_v2` read Japanese kanji with Chinese
+  readings. `language_code` is always sent (v2 does not accept it). Turbo/Flash v2.5 show
+  pinyin in `normalized_alignment` but pronounce correctly with `language_code: ja`.
+
 ## Goals
 
 - Any compliant avatar can say any text in any language, with matching mouth movements.
@@ -417,8 +437,8 @@ Milestones 1 and 2 need no external service.
 
 1. How AvatarScript consumes the mesh engine: path dependency, a published package extracted
    from mesh-avatar-studio, or moving the engine here.
-2. ElevenLabs alignment and v3 tags: do tag characters appear in `alignment`? Which of
-   `alignment` / `normalized_alignment` maps back to our text?
+2. ~~ElevenLabs alignment and v3 tags~~ — answered: tag characters appear in `alignment`, which
+   maps to the text sent (see Progress).
 3. G2P and alignment in Node: MulmoCast integration favors Node-only runtime code, while
    espeak-ng, Japanese readings and CTC alignment are most mature in Python. Python may be used
    for prototyping and as an accuracy reference.

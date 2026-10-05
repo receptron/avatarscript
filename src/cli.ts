@@ -1,0 +1,137 @@
+#!/usr/bin/env node
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+import { toWav } from './audio.ts';
+import { loadAvatar, type Avatar } from './avatar.ts';
+import { compile, detectLang } from './compile.ts';
+import { render } from './render.ts';
+import type { Score } from './score.ts';
+import { parseScript, plainScript, type Script } from './script.ts';
+import { cached } from './tts/cache.ts';
+import { elevenLabs } from './tts/elevenlabs.ts';
+import { mockTts } from './tts/mock.ts';
+import type { TtsAdapter } from './tts/types.ts';
+
+const USAGE = `Usage:
+  avatarscript make    --avatar <dir> --script <file.avs|file.txt> -o <video.mp4> [options]
+  avatarscript compile --avatar <dir> --script <file.avs|file.txt> -o <name.score.json> [options]
+  avatarscript render  --avatar <dir> --score <name.score.json> -o <video.mp4> [options]
+
+Speech (make, compile):
+  --tts <elevenlabs|mock>  speech provider (required; mock needs no key and makes a buzz)
+  --voice <id>             ElevenLabs voice id (default: avatar.json, ELEVENLABS_VOICE_ID, then Sarah)
+  --model <id>             ElevenLabs model (default: eleven_v3)
+  --lang <code>            language of the text (default: front matter, then detected)
+
+Video (make, render):
+  --fps <n>                frames per second (default 30)
+  --size <WxH>             video size (default 1280x720)
+  --background <color>     CSS colour behind the avatar (default #e9edf2)
+  --seed <n>               randomness of blinks and idle motion (default 1)
+  --engine <dir>           mesh-avatar-studio checkout (default ../mesh-avatar-studio)
+
+ELEVENLABS_API_KEY is read from the environment or a .env file.`;
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+for (const file of [resolve('.env'), join(repoRoot, '.env')]) {
+  if (existsSync(file)) { process.loadEnvFile(file); break; }
+}
+
+const { positionals, values: args } = parseArgs({
+  allowPositionals: true,
+  options: {
+    avatar: { type: 'string' }, script: { type: 'string' }, score: { type: 'string' }, out: { type: 'string', short: 'o' },
+    tts: { type: 'string' }, voice: { type: 'string' }, model: { type: 'string' }, lang: { type: 'string' },
+    fps: { type: 'string' }, size: { type: 'string' }, background: { type: 'string' }, seed: { type: 'string' },
+    engine: { type: 'string' }, help: { type: 'boolean', short: 'h' },
+  },
+});
+
+function need(name: keyof typeof args): string {
+  const v = args[name];
+  if (typeof v !== 'string' || !v) throw new Error(`--${name} is required\n\n${USAGE}`);
+  return v;
+}
+
+const num = (name: 'fps' | 'seed', fallback: number) => {
+  const v = args[name];
+  if (v === undefined) return fallback;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0) throw new Error(`--${name} must be a whole number`);
+  return n;
+};
+
+function ttsAdapter(avatar: Avatar): TtsAdapter {
+  const provider = need('tts');
+  if (provider === 'mock') return mockTts();
+  if (provider !== 'elevenlabs') throw new Error(`unknown --tts "${provider}" (use elevenlabs or mock)`);
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error('ELEVENLABS_API_KEY is not set (environment or .env)');
+  const config = avatar.manifest.voice?.elevenlabs ?? {};
+  // "Sarah", one of ElevenLabs' premade multilingual voices
+  const voiceId = args.voice ?? config.voiceId ?? process.env.ELEVENLABS_VOICE_ID ?? 'EXAVITQu4vr4xnSDxMaL';
+  return elevenLabs({ apiKey, voiceId, model: args.model ?? config.model });
+}
+
+async function loadScript(path: string): Promise<Script> {
+  const source = await readFile(path, 'utf8');
+  return extname(path) === '.avs' ? parseScript(source) : plainScript(source);
+}
+
+async function compileStep(avatar: Avatar, scorePath: string): Promise<Score> {
+  const scriptPath = need('script');
+  const script = await loadScript(scriptPath);
+  const lang = args.lang ?? script.meta.lang ?? detectLang(script.plain);
+  const tts = cached(ttsAdapter(avatar), join(dirname(scorePath), '.tts-cache'));
+  const audioPath = scorePath.replace(/(\.score)?\.json$/, '') + '.wav';
+  const { score, audio } = await compile(script, tts, {
+    lang, scriptName: relative(dirname(scorePath), scriptPath), audioName: basename(audioPath),
+    onSegment: (i, n, text) => console.log(`speech ${i + 1}/${n}: ${text.length > 40 ? text.slice(0, 40) + '…' : text}`),
+  });
+  await mkdir(dirname(scorePath), { recursive: true });
+  await writeFile(audioPath, toWav(audio));
+  await writeFile(scorePath, JSON.stringify(score, null, 1) + '\n');
+  console.log(`wrote ${scorePath} and ${audioPath} (${score.duration.toFixed(1)} s)`);
+  return score;
+}
+
+async function renderStep(avatar: Avatar, score: Score, scorePath: string, out: string) {
+  const size = /^(\d+)x(\d+)$/.exec(args.size ?? '1280x720');
+  if (!size) throw new Error('--size must look like 1280x720');
+  await mkdir(dirname(out), { recursive: true });
+  let last = -1;
+  await render({
+    avatar, score, out, audioPath: resolve(dirname(scorePath), score.audio),
+    fps: num('fps', 30), width: Number(size[1]), height: Number(size[2]), seed: num('seed', 1),
+    background: args.background, engineRoot: args.engine,
+    onProgress: (f, n) => {
+      const pct = Math.floor(f / n * 10) * 10;
+      if (pct !== last) { last = pct; console.log(`render ${pct}% (${f}/${n} frames)`); }
+    },
+  });
+  console.log(`wrote ${out}`);
+}
+
+async function main() {
+  const command = positionals[0];
+  if (args.help || !command) { console.log(USAGE); return; }
+  const avatar = await loadAvatar(need('avatar'));
+  const out = resolve(need('out'));
+  if (command === 'compile') {
+    if (!out.endsWith('.json')) throw new Error('compile writes a score: -o must end with .score.json');
+    await compileStep(avatar, out);
+  } else if (command === 'render') {
+    const scorePath = resolve(need('score'));
+    await renderStep(avatar, JSON.parse(await readFile(scorePath, 'utf8')), scorePath, out);
+  } else if (command === 'make') {
+    const scorePath = out.replace(/\.[^.\/]+$/, '') + '.score.json';
+    await renderStep(avatar, await compileStep(avatar, scorePath), scorePath, out);
+  } else {
+    throw new Error(`unknown command "${command}"\n\n${USAGE}`);
+  }
+}
+
+main().catch(error => { console.error(`avatarscript: ${error.message}`); process.exitCode = 1; });
