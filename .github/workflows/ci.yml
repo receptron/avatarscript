@@ -27,13 +27,15 @@ env:
   ONNXRUNTIME_NODE_INSTALL: skip
   MESH_AVATAR_STUDIO_REF: 8713e85a00e50f5cdf8fe33294b961d1d6506fc9
 
+# Timeouts are generous: here they also count time spent queued for a runner, and jobs that take
+# a minute were cancelled after 15 minutes of waiting when runners were busy.
 jobs:
   # Platform-independent: prettier, eslint, tsc and the build answer the same on every runner, so
   # they run once. Separate from the tests so a lint or type error surfaces without waiting for them.
   checks:
     name: Format, lint, typecheck, build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: avatarscript
@@ -93,7 +95,7 @@ jobs:
   test:
     name: Test (${{ matrix.os }}, node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -127,7 +129,7 @@ jobs:
   package-smoke:
     name: Package smoke (pack, install, render)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: avatarscript
