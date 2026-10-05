@@ -11,7 +11,7 @@ Working notes for AI coding agents in this repo. What the project is and how to 
   rendering is affected — `scripts/smoke.sh ../mesh-avatar-studio/samples/miko-qipao`, the same
   pack-install-render check CI runs (`.github/workflows/ci.yml`).
 - **Type-checking covers the whole repo only if the tsconfig says so.** `tsconfig.json` includes
-  `src`, `tests` and `scripts`. A new top-level folder of `.ts` files must be added there, or
+  `src`, `tests`, `scripts` and `examples`. A new top-level folder of `.ts` files must be added there, or
   nothing type-checks it and nothing tells you.
 - **Tests must run without API keys.** Mock external services (the TTS adapters have
   `mockTts()`); a test that calls a real API is not a unit test here.

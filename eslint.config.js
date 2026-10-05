@@ -69,7 +69,7 @@ export default [
     // that makes a rejection vanish, an async callback handed to an API that ignores the promise,
     // and an `any` arriving from outside — JSON.parse, Response.json(), page.evaluate() — that then
     // type-checks against every use it reaches.
-    files: ["src/**/*.ts", "scripts/**/*.ts"],
+    files: ["src/**/*.ts", "scripts/**/*.ts", "examples/**/*.ts"],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },

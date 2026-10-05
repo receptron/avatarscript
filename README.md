@@ -48,19 +48,22 @@ render page has no network access.
 
 ## Library
 
-```js
-import { loadAvatar, parseScript, compile, render, elevenLabs, cached, toWav } from 'avatarscript';
-import { writeFile } from 'node:fs/promises';
+[`examples/make-video.ts`](examples/make-video.ts) is a complete, runnable example. In short:
 
-const avatar = await loadAvatar('path/to/avatar');
-const tts = cached(elevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY, voiceId: '...' }), 'out/.tts-cache');
-const { score, audio } = await compile(parseScript('[emotion:happy] Hello! <nod>'), tts, { lang: 'en', audioName: 'hello.wav' });
-await writeFile('out/hello.wav', toWav(audio));
-await render({ avatar, score, audioPath: 'out/hello.wav', out: 'out/hello.mp4' });
+```js
+import { loadAvatar, parseScript, compile, render, elevenLabs, cached, toWav } from "avatarscript";
+import { writeFile } from "node:fs/promises";
+
+const avatar = await loadAvatar("path/to/avatar");
+const tts = cached(elevenLabs({ apiKey: process.env.ELEVENLABS_API_KEY, voiceId: "..." }), "out/.tts-cache");
+const { score, audio } = await compile(parseScript("[emotion:happy] Hello! <nod>"), tts, { lang: "en", audioName: "hello.wav" });
+await writeFile("out/hello.wav", toWav(audio));
+await render({ avatar, score, audioPath: "out/hello.wav", out: "out/hello.mp4" });
 ```
 
 `compile` returns the timed score and the audio; `render` turns a score into a video. Other
-speech providers plug in through the `TtsAdapter` interface.
+speech providers plug in through the `TtsAdapter` interface. `ScoreSchema` and
+`AvatarManifestSchema` (zod) validate scores and manifests read from files.
 
 ## Scripts
 

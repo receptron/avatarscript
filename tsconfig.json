@@ -10,7 +10,9 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // examples import the package by name, as users do; type-check them against the source
+    "paths": { "avatarscript": ["./src/index.ts"] }
   },
-  "include": ["src", "tests", "scripts"]
+  "include": ["src", "tests", "scripts", "examples"]
 }
