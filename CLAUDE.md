@@ -7,7 +7,7 @@ Working notes for AI coding agents in this repo. What the project is and how to 
 
 - **Package manager: npm** (package-lock.json). Add dependencies with `npm install` /
   `npm install --save-dev`; don't hand-edit the dependency lists in package.json.
-- Run after changes: `npm run typecheck`, `npm test`, and — when packaging, the engine bundle or
+- Run after changes: `npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, and — when packaging, the engine bundle or
   rendering is affected — `scripts/smoke.sh ../mesh-avatar-studio/samples/miko-qipao`, the same
   pack-install-render check CI runs (`.github/workflows/ci.yml`).
 - **Type-checking covers the whole repo only if the tsconfig says so.** `tsconfig.json` includes
@@ -26,6 +26,13 @@ Working notes for AI coding agents in this repo. What the project is and how to 
   module both import — not in two copies with a "keep these in sync" comment. When the two
   genuinely differ, share the common core and keep each side's extras local, with a test that
   pins the difference.
+- **Validate untyped data with zod; never cast it.** JSON files, provider responses and cache
+  entries go through a zod schema (`parseJson` / `check` in `src/json.ts`) where they enter, and
+  their TypeScript type is `z.infer` of that schema, so the check and the type cannot drift apart.
+  `as` casts and `!` are lint errors (tests excepted); narrow instead.
+- **Lint warnings do not exist here.** `eslint.config.js` raises every preset rule to error, as in
+  mulmoterminal. A rule that must not fail the build is turned off by name, for the files it
+  concerns, with the reason; inline `eslint-disable` comments are not used.
 - **Make a missing case a type error.** Write per-member tables as `Record<Union, …>` (as
   `MESH_MOUTH: Record<Viseme, MeshMouth>` does) and type a name that must refer to something real
   with that union, so adding a member without handling it fails `typecheck` instead of being

@@ -1,5 +1,5 @@
-import type { Emotion } from '../script.ts';
-import type { CharTime } from '../g2p/types.ts';
+import type { Emotion } from "../script.ts";
+import type { CharTime } from "../g2p/types.ts";
 
 export interface SynthesisRequest {
   /** text to speak (characters must come back in the timing in the same order) */

@@ -25,10 +25,10 @@ env:
   MESH_AVATAR_STUDIO_REF: 8713e85a00e50f5cdf8fe33294b961d1d6506fc9
 
 jobs:
-  # Platform-independent: tsc and the build answer the same on every runner, so they run once.
-  # Separate from the tests so a type error surfaces without waiting for them.
+  # Platform-independent: prettier, eslint, tsc and the build answer the same on every runner, so
+  # they run once. Separate from the tests so a lint or type error surfaces without waiting for them.
   checks:
-    name: Typecheck, build
+    name: Format, lint, typecheck, build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -58,6 +58,14 @@ jobs:
       - run: npm ci
         env:
           PUPPETEER_SKIP_DOWNLOAD: "true"
+
+      # Prettier first: a formatting slip is the cheapest failure to read.
+      - name: Format
+        run: npm run format:check
+
+      # Includes the type-aware rules (no floating promises, no `any` arriving from outside).
+      - name: Lint
+        run: npm run lint
 
       # Covers src, tests and scripts (tsconfig.json includes all three). Needed on its own
       # because vitest strips types rather than checking them.

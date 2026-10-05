@@ -104,13 +104,15 @@ repository: running from source (`node src/cli.ts …`) bundles the engine from 
 
 ```sh
 npm install
+npm run format     # Prettier
+npm run lint       # ESLint, including type-aware rules
 npm test
 npm run typecheck
 npm run build      # dist/, including the engine bundled from ../mesh-avatar-studio
 scripts/smoke.sh ../mesh-avatar-studio/samples/miko-qipao   # pack, install, render (as CI does)
 ```
 
-CI (`.github/workflows/ci.yml`) runs the typecheck and build, the tests on Ubuntu and macOS,
+CI (`.github/workflows/ci.yml`) runs Prettier, ESLint, the typecheck and build, the tests on Ubuntu and macOS,
 and the package smoke above, against a pinned mesh-avatar-studio commit.
 
 `npm run build` records the engine's source commit in `dist/engine/source.json`.
