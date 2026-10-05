@@ -26,12 +26,16 @@ a 2D mesh avatar with blinking, head motion, expressions and vowel mouths.
   decides the *timing*. LLMs are not asked to produce timestamps.
 - Every step leaves a reviewable, editable file: script, score, audio, video.
 - Rendering is reproducible: the same score, seed and avatar give the same video.
+- Once it works well, AvatarScript is incorporated into
+  [MulmoCast](https://github.com/receptron/mulmocast-cli) (see
+  [MulmoCast integration](#mulmocast-integration)). It is therefore built as a Node library
+  first; the CLI is a thin wrapper.
 
 ## Non-goals for v1
 
 - Audio input (voice recordings). The main case is text-to-speech.
-- TTS providers without timing data (OpenAI, Gemini). They need forced alignment, which is
-  deferred (see [Later](#later)).
+- TTS providers without timing data (OpenAI, Gemini). They need forced alignment, which comes
+  in milestone 6.
 - Real-time / streaming playback. v1 renders offline.
 - 3D avatars. The package format leaves room for them, but only the mesh runtime is built.
 
@@ -254,7 +258,9 @@ A Japanese kanji gets the time span of that character; its reading's moras are s
 
 ## 5. Rendering
 
-- Headless Chromium through Playwright, as `render-poses` already does in mesh-avatar-studio.
+- Headless Chromium through Puppeteer, which MulmoCast already uses, so integration adds no
+  second browser dependency. (mesh-avatar-studio's own tools use Playwright; either drives the
+  same WebGL page.)
 - The avatar is created with `manual: true`; each frame calls `advance(1 / fps)` after applying
   the cues due by that time.
 - Frames are read as raw RGBA (`gl.readPixels`) and piped to ffmpeg (`-f rawvideo`), which
@@ -311,6 +317,38 @@ avatarscript make    --avatar … --text hello.txt --tts elevenlabs -o hello.mp4
 - Avatar projects stay where they are (mesh-avatar-studio's ignored `projects/`). Outputs go to
   the folder given by `-o`. Do not commit user avatars, audio or videos.
 
+## MulmoCast integration
+
+MulmoCast turns a MulmoScript (a JSON list of *beats*, each with a speaker and text) into a
+podcast or video. It already synthesizes speech per beat (OpenAI by default; also Google,
+Gemini, ElevenLabs and Kotodama), renders with Puppeteer and ffmpeg, and has a per-beat
+`lipSync` option backed by a cloud provider (Replicate). AvatarScript would add a local,
+deterministic, avatar-based option next to it.
+
+| MulmoCast | AvatarScript |
+|---|---|
+| Speaker (`speechParams.speakers`) | Avatar package, referenced from the speaker |
+| Beat `text` | Plain text of one script section |
+| Beat-level emotion / direction (new) | `.avs` markup for that beat, written by the LLM |
+| Per-beat TTS audio | Audio input to the compiler (MulmoCast keeps owning TTS) |
+| Beat image / movie | Rendered avatar clip for that beat |
+
+What this means for the design:
+
+- **The compiler accepts existing audio.** Besides calling a TTS adapter, `compile` takes
+  `{ audio, timing? }` for a segment. Inside MulmoCast, the TTS it already produced is reused
+  and AvatarScript adds only the face.
+- **Forced alignment is needed before integration.** MulmoCast's default TTS (OpenAI) returns
+  no timing. v1 still starts with ElevenLabs, but the aligner (milestone 6) comes before
+  the integration milestone (7).
+- **Node only at runtime.** MulmoCast is a Node package, so G2P and alignment should run from
+  Node (e.g. kuromoji.js, an espeak-ng WebAssembly build, an ONNX aligner) rather than
+  requiring Python.
+- **Per-beat clips.** `render` can output one clip per beat (optionally with alpha) so
+  MulmoCast composites them with its own transitions, captions and BGM.
+- **Library API**, usable as a GraphAI agent:
+  `compile({ avatar, script, audio?, timing? }) → score` and `render({ avatar, score }) → clip`.
+
 ## Proposed repository layout
 
 ```
@@ -352,16 +390,22 @@ Each milestone ends with generated output inspected visually, not only tests.
 5. **LLM step + `make`.** Prompt from capabilities, validation and retry.
    *Done when:* `make` produces a video from plain text in Japanese and English.
 
+6. **Forced alignment + OpenAI and Gemini.** A local multilingual CTC aligner (e.g. Meta's MMS
+   model, run from Node via ONNX; `MMS_FA` / `ctc-forced-aligner` in Python as reference). It
+   also checks that the audio says the text, which catches LLM-based TTS dropping or changing
+   words; mismatched segments are synthesized again. Then the **OpenAI** (`gpt-4o-mini-tts`,
+   style via `instructions`) and **Gemini TTS** (style via prompt) adapters.
+   *Done when:* aligner timing on ElevenLabs audio is measured against ElevenLabs' own timing
+   and the error is acceptable on frame-by-frame review.
+7. **MulmoCast integration.** Avatar reference on speakers, beat-level markup, compile from
+   MulmoCast's own TTS audio, per-beat clips.
+   *Done when:* a MulmoScript with an avatar speaker produces a video in MulmoCast using its
+   default TTS provider.
+
 Milestones 1 and 2 need no external service.
 
 ## Later
 
-- **Forced alignment** for providers without timing: a local multilingual CTC aligner (e.g.
-  Meta's MMS through torchaudio `MMS_FA` or `ctc-forced-aligner`). It also checks that the
-  audio says the text, which catches LLM-based TTS dropping or changing words; mismatched
-  segments are synthesized again. Measure accuracy against ElevenLabs' own timing.
-- **OpenAI** (`gpt-4o-mini-tts`, style via `instructions`) and **Gemini TTS** (style via
-  prompt) on top of the aligner.
 - Other providers with timing: Azure (viseme events), Amazon Polly (speech marks), VOICEVOX
   (mora timings, local, Japanese).
 - Audio input (recordings) via ASR word timestamps + alignment.
@@ -375,10 +419,13 @@ Milestones 1 and 2 need no external service.
    from mesh-avatar-studio, or moving the engine here.
 2. ElevenLabs alignment and v3 tags: do tag characters appear in `alignment`? Which of
    `alignment` / `normalized_alignment` maps back to our text?
-3. G2P in Node vs. Python: espeak-ng and Japanese readings are easier in Python; the rest of the
-   toolchain is Node.
+3. G2P and alignment in Node: MulmoCast integration favors Node-only runtime code, while
+   espeak-ng, Japanese readings and CTC alignment are most mature in Python. Python may be used
+   for prototyping and as an accuracy reference.
 4. Script file extension: `.avs` is also used by AviSynth; alternatives `.avscript`,
    `.avatarscript`.
 5. Default pacing rules for the LLM (motion density, emotion granularity) — to tune on real
    output.
 6. Name check: trademarks and domains for "AvatarScript" are not yet checked.
+7. MulmoScript schema changes: where the avatar reference and per-beat markup live, and whether
+   AvatarScript replaces or sits beside MulmoCast's existing `lipSync` option.
