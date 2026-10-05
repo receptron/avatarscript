@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { outputCodecs } from "../src/render-encoder.ts";
-import { avatarRect } from "../src/render-page.ts";
+import { avatarAspect, avatarRect } from "../src/render-page.ts";
 import { joinCaptions, resolveSubtitles, segmentCaptions, subtitlesFromFrontMatter } from "../src/subtitles.ts";
 import { resolveView, viewFromFrontMatter } from "../src/view.ts";
 
@@ -59,9 +59,21 @@ describe("view", () => {
   it("places the avatar so the engine's picture fits its canvas exactly", () => {
     const rig = { image: { width: 1000, height: 1000 }, view: { padTop: 0, padSide: 0 } };
     const full = avatarRect(rig, 1280, 720, resolveView(undefined));
-    expect(full).toEqual({ x: 280, y: 0, w: 720, h: 720 });
+    expect(full).toEqual({ x: 280, y: 0, w: 720, h: 720, padTop: 0 });
     const small = avatarRect(rig, 1280, 720, resolveView(undefined, { avatarX: "25%", avatarY: "90%", avatarScale: "50%" }));
-    expect(small).toEqual({ x: 140, y: 288, w: 360, h: 360 });
+    expect(small).toEqual({ x: 140, y: 288, w: 360, h: 360, padTop: 0 });
+  });
+
+  it("crops the top of the image only where the frame's edge hides the cut", () => {
+    // the rig crops 10% off the top of its image, whose top edge is flat
+    const rig = { image: { width: 1000, height: 1000 }, view: { padTop: -0.1, padSide: 0 } };
+    expect(avatarRect(rig, 1280, 720, resolveView(undefined)).padTop).toBeCloseTo(-0.1);
+    const lowered = avatarRect(rig, 1280, 720, resolveView(undefined, { avatarScale: "60%" }));
+    expect(lowered.padTop).toBe(0);
+    expect(lowered.w).toBe(lowered.h); // the whole square image
+    expect(avatarRect(rig, 1280, 720, resolveView(undefined, { avatarScale: "60%" }), -0.1).padTop).toBeCloseTo(-0.1);
+    expect(avatarAspect(rig)).toBeCloseTo(1 / 0.9);
+    expect(avatarAspect(rig, 0)).toBe(1);
   });
 });
 

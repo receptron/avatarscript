@@ -87,7 +87,10 @@ await render({ avatar, score, audioPath: "voice.wav", audio: false, out: "avatar
 ```
 
 `motions[].at` names words in the text: the motion starts where they are spoken.
-`avatarAspect` gives the avatar's width ÷ height, to size a track that holds nothing else.
+`avatarAspect` gives the avatar's width ÷ height, to size a track that holds nothing else. Pass
+`padTop: 0` to both `avatarAspect(rig, 0)` and `render` for a track overlaid on other video: some rigs
+crop the flat top edge of their image, which is only hidden when the avatar reaches the top of the
+frame. (Placed with `avatar-y`/`avatar-scale` inside the frame, the whole image is shown already.)
 Decode the WebM with `-c:v libvpx-vp9` in ffmpeg to keep its alpha.
 
 ### Text-to-speech

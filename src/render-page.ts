@@ -58,7 +58,10 @@ declare global {
   interface Window {
     /** set by the bundled engine script */
     MeshAvatarEngine?: {
-      createMeshAvatar(canvas: HTMLCanvasElement, options: { rig: unknown; assets: Record<string, string>; manual: boolean }): Promise<MeshAvatarApi>;
+      createMeshAvatar(
+        canvas: HTMLCanvasElement,
+        options: { rig: unknown; assets: Record<string, string>; manual: boolean; padTop: number },
+      ): Promise<MeshAvatarApi>;
     };
     avatarscript?: PageState;
   }
@@ -71,6 +74,8 @@ export interface PageOptions {
   height: number;
   view: View;
   seed: number;
+  /** the engine's margin above the image, as a share of its height; default: see avatarRect() */
+  padTop?: number;
 }
 
 // the engine fits the image into its canvas with these margins (mesh-avatar-studio renderer.js)
@@ -79,18 +84,28 @@ const RigViewSchema = z.looseObject({
   view: z.object({ padTop: z.number().optional(), padSide: z.number().optional() }).optional(),
 });
 
-/** Width ÷ height of the avatar's picture as the engine draws it (its image and margins). */
-export function avatarAspect(rig: unknown): number {
+/**
+ * Width ÷ height of the avatar's picture as the engine draws it: its image and margins. `padTop`
+ * overrides the rig's margin above the image (a negative one crops the top of the image).
+ */
+export function avatarAspect(rig: unknown, padTop?: number): number {
   const r = check(RigViewSchema, rig, "rig");
-  return (r.image.width * (1 + 2 * (r.view?.padSide ?? 0))) / (r.image.height * (1 + (r.view?.padTop ?? 0)));
+  return (r.image.width * (1 + 2 * (r.view?.padSide ?? 0))) / (r.image.height * (1 + (padTop ?? r.view?.padTop ?? 0)));
 }
 
-/** Where the avatar goes in the frame: its canvas is shaped like the engine's picture, so nothing is cropped. */
-export function avatarRect(rig: unknown, width: number, height: number, view: View): Rect {
-  const aspect = avatarAspect(rig);
+/**
+ * Where the avatar goes in the frame, and the engine's top margin. A rig may crop the top of its
+ * image (a negative padTop) because the illustration's top edge is flat; that is hidden only when
+ * the avatar reaches the top of the frame. Placed lower, the crop would cut the head in mid-picture,
+ * so the whole image is shown instead, unless `padTop` says otherwise.
+ */
+export function avatarRect(rig: unknown, width: number, height: number, view: View, padTop?: number): Rect & { padTop: number } {
   const h = Math.round((height * parseFloat(view.avatarScale)) / 100);
-  const w = Math.round(h * aspect);
-  return { x: Math.round((width * parseFloat(view.avatarX)) / 100 - w / 2), y: Math.round((height * parseFloat(view.avatarY)) / 100 - h), w, h };
+  const y = Math.round((height * parseFloat(view.avatarY)) / 100 - h);
+  const rigPadTop = check(RigViewSchema, rig, "rig").view?.padTop ?? 0;
+  const pad = padTop ?? (y > 0 ? Math.max(0, rigPadTop) : rigPadTop);
+  const w = Math.round(h * avatarAspect(rig, pad));
+  return { x: Math.round((width * parseFloat(view.avatarX)) / 100 - w / 2), y, w, h, padTop: pad };
 }
 
 const IMAGE_TYPES: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
@@ -111,7 +126,7 @@ export async function openAvatarPage(browser: Browser, o: PageOptions): Promise<
   page.on("request", (r) => {
     (/^(data|about|blob):/.test(r.url()) ? r.continue() : r.abort()).catch(() => undefined);
   });
-  const rect = avatarRect(o.avatar.rig, o.width, o.height, o.view);
+  const { padTop, ...rect } = avatarRect(o.avatar.rig, o.width, o.height, o.view, o.padTop);
   await page.setViewport({ width: o.width, height: o.height, deviceScaleFactor: 1 });
   await page.setContent(
     `<!doctype html><html><body style="margin:0;overflow:hidden"><canvas id="avatar" style="display:block;width:${rect.w}px;height:${rect.h}px"></canvas></body></html>`,
@@ -132,6 +147,7 @@ export async function openAvatarPage(browser: Browser, o: PageOptions): Promise<
     width: o.width,
     height: o.height,
     rect,
+    padTop,
     ...(await backgroundSource(o.view.background)),
   });
   return { page, errors, ...result };
@@ -141,7 +157,7 @@ export async function openAvatarPage(browser: Browser, o: PageOptions): Promise<
 async function setUpPage(
   rig: unknown,
   assets: Record<string, string>,
-  o: { width: number; height: number; rect: Rect; image: string | null; color: string },
+  o: { width: number; height: number; rect: Rect; padTop: number; image: string | null; color: string },
 ): Promise<{ motions: string[]; opaque: boolean }> {
   const canvas = document.getElementById("avatar");
   const make = () => Object.assign(document.createElement("canvas"), { width: o.width, height: o.height });
@@ -164,7 +180,7 @@ async function setUpPage(
   const pixels = bctx.getImageData(0, 0, o.width, o.height).data;
   let opaque = true;
   for (let i = 3; i < pixels.length && opaque; i += 4) opaque = pixels[i] === 255;
-  const av = await engine.createMeshAvatar(canvas, { rig, assets, manual: true });
+  const av = await engine.createMeshAvatar(canvas, { rig, assets, manual: true, padTop: o.padTop });
   av.setAutoMotion(false);
   av.setAutoIdle(true);
   av.setEmotion("neutral", { playMotion: false });

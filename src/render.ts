@@ -31,6 +31,12 @@ export interface RenderOptions {
   seed?: number;
   /** mouth shapes lead the sound slightly so the smoothed mouth arrives on time, seconds */
   mouthLead?: number;
+  /**
+   * The engine's margin above the avatar image, as a share of its height. Default: the rig's, except
+   * that the top of the image is not cropped when the avatar is placed below the top of the frame.
+   * Use 0 (or more) for a track overlaid on other video, so the whole head shows.
+   */
+  padTop?: number;
   /** subtitles over the score's: false off, true on, or style fields to change */
   subtitles?: boolean | SubtitleStyleInput;
   onProgress?: (frame: number, total: number) => void;
@@ -70,7 +76,7 @@ export async function render(options: RenderOptions): Promise<void> {
   const browser = await puppeteer.launch({ headless: true });
   let encoder: ReturnType<typeof startEncoder> | undefined;
   try {
-    const { page, motions, errors, opaque } = await openAvatarPage(browser, { avatar, engine, width, height, view, seed });
+    const { page, motions, errors, opaque } = await openAvatarPage(browser, { avatar, engine, width, height, view, seed, padTop: options.padTop });
     encoder = startEncoder(out, options.audio === false ? null : options.audioPath, fps, !opaque);
     const unknown = [...new Set(score.cues.flatMap((c) => ("motion" in c && !motions.includes(c.motion) ? [c.motion] : [])))];
     if (unknown.length) throw new Error(`unknown motion(s) for this avatar: ${unknown.join(", ")}. Available: ${motions.join(", ")}`);
