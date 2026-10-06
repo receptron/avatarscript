@@ -75,6 +75,26 @@ function diskStore(dir: string): Store {
   };
 }
 
+const MAX_REDIRECTS = 5;
+
+/**
+ * Follows redirects only within the URL's origin, so a public host cannot send these requests to
+ * another one (an internal service, say). GitHub's github.com/…/raw/… links redirect to
+ * raw.githubusercontent.com: use the latter.
+ */
+async function fetchSameOrigin(url: URL): Promise<Response> {
+  let location = url;
+  for (let hops = 0; hops <= MAX_REDIRECTS; hops++) {
+    const response = await fetch(location, { redirect: "manual", signal: AbortSignal.timeout(120_000) });
+    const next = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+    if (!next) return response;
+    const target = new URL(next, location);
+    if (target.origin !== url.origin) throw new Error(`${url.href} redirects to another host (${target.origin}); use the final URL`);
+    location = target;
+  }
+  throw new Error(`${url.href}: too many redirects`);
+}
+
 function urlStore(url: string, cacheDir: string): Store {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error(`${url}: only http and https avatar URLs are supported`);
@@ -87,7 +107,7 @@ function urlStore(url: string, cacheDir: string): Store {
   const download = async (location: string, kind: "json" | "png") => {
     const request = new URL(location);
     if (!request.search) request.search = parsed.search;
-    const response = await fetch(request, { signal: AbortSignal.timeout(120_000) });
+    const response = await fetchSameOrigin(request);
     if (response.status === 404) return undefined;
     if (!response.ok) throw new Error(`${location}: HTTP ${response.status}`);
     if (Number(response.headers.get("content-length") ?? 0) > MAX_DOWNLOAD) throw new Error(`${location}: larger than ${MAX_DOWNLOAD} bytes`);

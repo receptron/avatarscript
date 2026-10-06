@@ -56,7 +56,8 @@ npx avatarscript make --avatar https://raw.githubusercontent.com/receptron/mulmo
 From a URL, the package's small JSON files are fetched each time and its images are cached in
 `~/.cache/avatarscript/avatars/` (or `$AVATARSCRIPT_AVATAR_DIR`), per build of the avatar, so an
 updated avatar is fetched again. Only files inside the package's folder are fetched, each at most
-32 MB, and images must be PNGs. Put a commit in the URL instead of `main` to pin a version. Only the text is sent to ElevenLabs; avatar images stay local, and the
+32 MB, and images must be PNGs. Redirects are followed only within the same origin, so use direct
+file URLs (`raw.githubusercontent.com`, not `github.com/.../raw/...`). Put a commit in the URL instead of `main` to pin a version. Only the text is sent to ElevenLabs; avatar images stay local, and the
 render page has no network access.
 
 ## Library

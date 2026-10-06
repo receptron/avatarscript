@@ -21,6 +21,8 @@ beforeAll(async () => {
     const path = decodeURIComponent((req.url ?? "/").split("?")[0]);
     requests.push(path);
     queries.push((req.url ?? "").split("?")[1] ?? "");
+    if (path === "/moved/avatar.json") return void res.writeHead(302, { location: "/ani/avatar.json" }).end();
+    if (path === "/away/avatar.json") return void res.writeHead(302, { location: "https://example.com/avatar.json" }).end();
     const override = overrides.get(path);
     if (override === null) return void res.writeHead(404).end();
     if (override !== undefined) return void res.end(override);
@@ -125,6 +127,15 @@ describe("loadAvatar", () => {
     fresh();
     overrides.set("/ani/built/base.png", "<html>not an image</html>");
     await expect(loadAvatar(`${base}/ani/`, { cacheDir: join(cacheDir, "empty") })).rejects.toThrow("not a PNG");
+  });
+
+  it("follows redirects only within the same origin", async () => {
+    fresh();
+    // the manifest moved; its files resolve against the requested folder, so only the manifest is found
+    await expect(loadAvatar(`${base}/moved/`, { cacheDir })).rejects.toThrow("/moved/");
+    expect(requests).toContain("/ani/avatar.json");
+    fresh();
+    await expect(loadAvatar(`${base}/away/`, { cacheDir })).rejects.toThrow("redirects to another host");
   });
 
   it("rejects what is not an avatar or not http(s)", async () => {
