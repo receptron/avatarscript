@@ -14,9 +14,9 @@ import { parseScript, plainScript, type Script } from "./script.ts";
 import { createTts, isTtsProvider, TTS_PROVIDERS, type TextToSpeech } from "./tts/index.ts";
 
 const USAGE = `Usage:
-  avatarscript make    --avatar <dir> --script <file.avs|file.txt> -o <video.mp4|.webm|.mov> [options]
-  avatarscript compile --avatar <dir> --script <file.avs|file.txt> -o <name.score.json> [options]
-  avatarscript render  --avatar <dir> --score <name.score.json> -o <video.mp4> [options]
+  avatarscript make    --avatar <dir|url> --script <file.avs|file.txt> -o <video.mp4|.webm|.mov> [options]
+  avatarscript compile --avatar <dir|url> --script <file.avs|file.txt> -o <name.score.json> [options]
+  avatarscript render  --avatar <dir|url> --score <name.score.json> -o <video.mp4> [options]
 
 Speech (make, compile):
   --tts <provider>         elevenlabs, openai or gemini (keys: ELEVENLABS_API_KEY, OPENAI_API_KEY,

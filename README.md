@@ -43,8 +43,20 @@ voice. The steps can also be run separately with `compile` and `render`; run
 `npx avatarscript --help` for all options (voice, model, size, fps, background, seed).
 
 `--avatar` takes a mesh-avatar-studio project folder (`rig.json` + `built/`) or a folder with an
-`avatar.json` manifest. The repository includes one sample avatar, [`avatars/ani`](avatars/ani)
-(not in the npm package; clone the repository to use it). Only the text is sent to ElevenLabs; avatar images stay local, and the
+`avatar.json` manifest, on disk or at an http(s) URL. The repository includes one sample avatar,
+[`avatars/ani`](avatars/ani) (not in the npm package). It is also published in
+[mulmocast-media](https://github.com/receptron/mulmocast-media/tree/main/avatars), so it works
+without a clone:
+
+```sh
+npx avatarscript make --avatar https://raw.githubusercontent.com/receptron/mulmocast-media/main/avatars/ani \
+  --script hello.avs --tts elevenlabs -o out/hello.mp4
+```
+
+From a URL, the package's small JSON files are fetched each time and its images are cached in
+`~/.cache/avatarscript/avatars/` (or `$AVATARSCRIPT_AVATAR_DIR`), per build of the avatar, so an
+updated avatar is fetched again. Only files inside the package's folder are fetched, each at most
+32 MB, and images must be PNGs. Put a commit in the URL instead of `main` to pin a version. Only the text is sent to ElevenLabs; avatar images stay local, and the
 render page has no network access.
 
 ## Library
@@ -55,7 +67,7 @@ render page has no network access.
 import { loadAvatar, parseScript, compile, render, createTts, toWav } from "avatarscript";
 import { writeFile } from "node:fs/promises";
 
-const avatar = await loadAvatar("path/to/avatar");
+const avatar = await loadAvatar("path/to/avatar"); // or an https:// URL of the avatar folder
 const tts = createTts({ provider: "elevenlabs", cacheDir: "out/.tts-cache" }); // key from ELEVENLABS_API_KEY
 const { score, audio } = await compile(parseScript("[emotion:happy] Hello! <nod>"), tts, { lang: "en", audioName: "hello.wav" });
 await writeFile("out/hello.wav", toWav(audio));
@@ -81,7 +93,7 @@ const { score, audio } = await compileTimeline(
   { lang: "ja", duration: 9, view: { background: "transparent" } },
 );
 await writeFile("voice.wav", toWav(audio)); // moves the head with the voice
-const avatar = await loadAvatar("path/to/avatar");
+const avatar = await loadAvatar("path/to/avatar"); // or an https:// URL of the avatar folder
 const height = 446, width = Math.round(height * avatarAspect(avatar.rig) / 2) * 2;
 // one continuous, see-through avatar track, picture only, to overlay on another video
 await render({ avatar, score, audioPath: "voice.wav", audio: false, out: "avatar.webm", width, height });

@@ -1,8 +1,8 @@
 // AvatarScript library: avatar + script → speech, timed score and video.
 export { parseScript, plainScript, ScriptError, EMOTIONS } from "./script.ts";
 export type { Script, Segment, Cue, Emotion } from "./script.ts";
-export { loadAvatar, AvatarManifestSchema } from "./avatar.ts";
-export type { Avatar, AvatarManifest } from "./avatar.ts";
+export { loadAvatar, avatarCacheDir, AvatarManifestSchema } from "./avatar.ts";
+export type { Avatar, AvatarManifest, LoadAvatarOptions } from "./avatar.ts";
 export { compile, detectLang } from "./compile.ts";
 export type { CompileOptions } from "./compile.ts";
 export { render } from "./render.ts";
