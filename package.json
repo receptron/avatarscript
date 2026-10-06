@@ -1,6 +1,6 @@
 {
   "name": "avatarscript",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Turn an avatar and text into a lip-synced, acted video.",
   "keywords": [
     "avatar",

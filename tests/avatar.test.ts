@@ -9,6 +9,7 @@ import { loadAvatar } from "../src/avatar.ts";
 // Serves avatars/ani over HTTP, with per-test overrides, and counts requests per path.
 const ANI = resolve(import.meta.dirname, "../avatars/ani");
 const requests: string[] = [];
+const queries: string[] = [];
 const overrides = new Map<string, string | null>();
 let server: Server;
 let base: string;
@@ -19,6 +20,7 @@ beforeAll(async () => {
   server = createServer((req, res) => {
     const path = decodeURIComponent((req.url ?? "/").split("?")[0]);
     requests.push(path);
+    queries.push((req.url ?? "").split("?")[1] ?? "");
     const override = overrides.get(path);
     if (override === null) return void res.writeHead(404).end();
     if (override !== undefined) return void res.end(override);
@@ -39,6 +41,7 @@ afterAll(async () => {
 
 const fresh = () => {
   requests.length = 0;
+  queries.length = 0;
   overrides.clear();
 };
 
@@ -82,6 +85,30 @@ describe("loadAvatar", () => {
     const avatar = await loadAvatar(`${base}/ani`, { cacheDir });
     expect(avatar.manifest.name).toBe("ani");
     expect(avatar.drawnMouths).toBe(true);
+  });
+
+  it("keeps the URL's query (a version, a signature) on every request", async () => {
+    fresh();
+    const local = await loadAvatar(ANI);
+    const viaManifest = await loadAvatar(`${base}/ani/avatar.json?v=1`, { cacheDir: join(cacheDir, "query") });
+    expect(viaManifest.assets).toEqual(local.assets);
+    expect(new Set(queries)).toEqual(new Set(["v=1"]));
+    fresh();
+    await loadAvatar(`${base}/ani?v=2`, { cacheDir: join(cacheDir, "query") });
+    expect(requests).toContain("/ani/avatar.json");
+    // another version is another cache entry: its images are fetched, not taken from v=1
+    expect(requests).toContain("/ani/built/base.png");
+    expect(new Set(queries)).toEqual(new Set(["v=2"]));
+  });
+
+  it("keeps an asset's own query", async () => {
+    fresh();
+    const manifest = JSON.parse(await readFile(join(ANI, "avatar.json"), "utf8")) as { assets: Record<string, string> };
+    overrides.set("/ani/avatar.json", JSON.stringify({ ...manifest, assets: { ...manifest.assets, rig: "rig.json?token=abc" } }));
+    overrides.set("/ani/rig.json", await readFile(join(ANI, "rig.json"), "utf8"));
+    await loadAvatar(`${base}/ani/?v=3`, { cacheDir });
+    expect(queries[requests.indexOf("/ani/rig.json")]).toBe("token=abc");
+    expect(queries[requests.indexOf("/ani/built/layers.json")]).toBe("v=3");
   });
 
   it("refuses files outside the avatar's folder", async () => {
