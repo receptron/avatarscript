@@ -32,7 +32,7 @@ echo "ELEVENLABS_API_KEY=..." > .env    # read from the environment or ./.env
 ## Command line
 
 ```sh
-npx avatarscript make --avatar ../mesh-avatar-studio/samples/miko-qipao \
+npx avatarscript make --avatar avatars/ani \
   --script examples/hello-ja.avs --tts elevenlabs -o out/hello-ja.mp4
 ```
 
@@ -43,7 +43,8 @@ voice. The steps can also be run separately with `compile` and `render`; run
 `npx avatarscript --help` for all options (voice, model, size, fps, background, seed).
 
 `--avatar` takes a mesh-avatar-studio project folder (`rig.json` + `built/`) or a folder with an
-`avatar.json` manifest. Only the text is sent to ElevenLabs; avatar images stay local, and the
+`avatar.json` manifest. The repository includes one sample avatar, [`avatars/ani`](avatars/ani)
+(not in the npm package; clone the repository to use it). Only the text is sent to ElevenLabs; avatar images stay local, and the
 render page has no network access.
 
 ## Library
@@ -136,7 +137,7 @@ A script is the text to speak with inline direction. Plain `.txt` files are spok
 ---
 lang: ja
 ---
-[emotion:happy] みなさん、こんにちは！<nod> ミコです。
+[emotion:happy] みなさん、こんにちは！<nod> アニです。
 [pause:300ms]
 [emotion:surprised] テキストを書くだけで、私がしゃべるんです！<surprise>
 ```
@@ -218,7 +219,7 @@ npm run lint       # ESLint, including type-aware rules
 npm test
 npm run typecheck
 npm run build      # dist/, including the engine bundled from ../mesh-avatar-studio
-scripts/smoke.sh ../mesh-avatar-studio/samples/miko-qipao   # pack, install, render (as CI does)
+scripts/smoke.sh avatars/ani   # pack, install, render (as CI does)
 ```
 
 CI (`.github/workflows/ci.yml`) runs Prettier, ESLint, the typecheck and build, the tests on Ubuntu and macOS,
@@ -231,4 +232,5 @@ and the package smoke above, against a pinned mesh-avatar-studio commit.
 [MIT](LICENSE). The bundled mesh avatar engine (`dist/engine/`) is from
 [mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio), MIT License,
 © Yuki Shindo; its license is included as `dist/engine/LICENSE.mesh-avatar-studio`. The
-Miko sample character in mesh-avatar-studio has its own usage terms and is not included.
+sample avatar `avatars/ani` (illustration and built layers) is © 2026 receptron, under the same
+MIT License.

@@ -5,7 +5,7 @@
 # Then check the video is real: an H.264 + AAC MP4 of the expected length whose frames show
 # the avatar, not a blank canvas.
 #
-# Usage: scripts/smoke.sh <avatar folder>   (e.g. ../mesh-avatar-studio/samples/miko-qipao)
+# Usage: scripts/smoke.sh <avatar folder>   (e.g. avatars/ani)
 set -euo pipefail
 
 AVATAR="$(cd "${1:?usage: scripts/smoke.sh <avatar folder>}" && pwd)"

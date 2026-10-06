@@ -8,12 +8,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { compile, createTts, detectLang, loadAvatar, parseScript, render, toWav } from "avatarscript";
 
-// 1. The avatar: a mesh-avatar-studio project folder (rig.json + built/) or an avatar.json package.
-const avatar = await loadAvatar("../mesh-avatar-studio/samples/miko-qipao");
+// 1. The avatar: an avatar.json package (here the bundled sample, ani) or a mesh-avatar-studio
+// project folder (rig.json + built/).
+const avatar = await loadAvatar("avatars/ani");
 
 // 2. The script: text with direction. Use plainScript(text) for text without markup.
 const script = parseScript(`
-[emotion:happy] Hi everyone! <nod> I'm Miko.
+[emotion:happy] Hi everyone! <nod> I'm Ani.
 [pause:300ms]
 [emotion:surprised] You just write the words, and I speak them! <surprise>
 `);

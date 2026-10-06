@@ -166,4 +166,4 @@ jobs:
       - run: npm ci
 
       - name: Pack, install, render
-        run: scripts/smoke.sh ../mesh-avatar-studio/samples/miko-qipao
+        run: scripts/smoke.sh avatars/ani
