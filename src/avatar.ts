@@ -78,9 +78,14 @@ function diskStore(dir: string): Store {
 function urlStore(url: string, cacheDir: string): Store {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error(`${url}: only http and https avatar URLs are supported`);
-  const folder = parsed.pathname.endsWith("/avatar.json") ? new URL(".", parsed).href : parsed.href.replace(/\/?$/, "/");
+  // locations are kept without the query; the source's query (a version, a signature) goes with every request
+  const folderUrl = new URL(parsed);
+  folderUrl.search = folderUrl.hash = "";
+  folderUrl.pathname = parsed.pathname.endsWith("/avatar.json") ? parsed.pathname.slice(0, -"avatar.json".length) : parsed.pathname.replace(/\/?$/, "/");
+  const folder = folderUrl.href;
   const download = async (location: string, kind: "json" | "png") => {
-    const response = await fetch(location, { signal: AbortSignal.timeout(120_000) });
+    const request = Object.assign(new URL(location), { search: parsed.search });
+    const response = await fetch(request, { signal: AbortSignal.timeout(120_000) });
     if (response.status === 404) return undefined;
     if (!response.ok) throw new Error(`${location}: HTTP ${response.status}`);
     if (Number(response.headers.get("content-length") ?? 0) > MAX_DOWNLOAD) throw new Error(`${location}: larger than ${MAX_DOWNLOAD} bytes`);
