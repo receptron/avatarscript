@@ -96,7 +96,19 @@ describe("loadAvatar", () => {
     fresh();
     await loadAvatar(`${base}/ani?v=2`, { cacheDir: join(cacheDir, "query") });
     expect(requests).toContain("/ani/avatar.json");
+    // another version is another cache entry: its images are fetched, not taken from v=1
+    expect(requests).toContain("/ani/built/base.png");
     expect(new Set(queries)).toEqual(new Set(["v=2"]));
+  });
+
+  it("keeps an asset's own query", async () => {
+    fresh();
+    const manifest = JSON.parse(await readFile(join(ANI, "avatar.json"), "utf8")) as { assets: Record<string, string> };
+    overrides.set("/ani/avatar.json", JSON.stringify({ ...manifest, assets: { ...manifest.assets, rig: "rig.json?token=abc" } }));
+    overrides.set("/ani/rig.json", await readFile(join(ANI, "rig.json"), "utf8"));
+    await loadAvatar(`${base}/ani/?v=3`, { cacheDir });
+    expect(queries[requests.indexOf("/ani/rig.json")]).toBe("token=abc");
+    expect(queries[requests.indexOf("/ani/built/layers.json")]).toBe("v=3");
   });
 
   it("refuses files outside the avatar's folder", async () => {

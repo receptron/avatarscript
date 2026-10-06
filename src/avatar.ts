@@ -78,13 +78,15 @@ function diskStore(dir: string): Store {
 function urlStore(url: string, cacheDir: string): Store {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error(`${url}: only http and https avatar URLs are supported`);
-  // locations are kept without the query; the source's query (a version, a signature) goes with every request
+  // locations are kept without the source's query, which (a version, a signature) goes with every
+  // request for a file that has no query of its own
   const folderUrl = new URL(parsed);
   folderUrl.search = folderUrl.hash = "";
   folderUrl.pathname = parsed.pathname.endsWith("/avatar.json") ? parsed.pathname.slice(0, -"avatar.json".length) : parsed.pathname.replace(/\/?$/, "/");
   const folder = folderUrl.href;
   const download = async (location: string, kind: "json" | "png") => {
-    const request = Object.assign(new URL(location), { search: parsed.search });
+    const request = new URL(location);
+    if (!request.search) request.search = parsed.search;
     const response = await fetch(request, { signal: AbortSignal.timeout(120_000) });
     if (response.status === 404) return undefined;
     if (!response.ok) throw new Error(`${location}: HTTP ${response.status}`);
@@ -100,8 +102,9 @@ function urlStore(url: string, cacheDir: string): Store {
     contains: (root, location) => location.startsWith(root.replace(/\/?$/, "/")),
     async read(location, kind, cacheKey) {
       if (!cacheKey) return download(location, kind);
-      // cached per package and per listing that names the file, so a rebuilt avatar is fetched again
-      const file = join(cacheDir, hash(folder), cacheKey, hash(location) + "." + kind);
+      // cached per package (and its query: another version) and per listing that names the file, so
+      // a rebuilt avatar is fetched again
+      const file = join(cacheDir, hash(folder + parsed.search), cacheKey, hash(location) + "." + kind);
       const cached = await readFile(file).catch(() => undefined);
       if (cached) return cached;
       const body = await download(location, kind);
