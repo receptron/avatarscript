@@ -128,10 +128,11 @@ describe("gemini speaking style", () => {
     vi.useRealTimers();
   });
 
-  it("sends the text alone when no style is given", async () => {
+  it("sends the emotion's style as director's notes even without options", async () => {
+    // text alone fails on gemini-2.5-flash-preview-tts when it is a question
     const bodies = stubFetch(geminiResponse);
     await speak(geminiProvider, {});
-    expect(geminiText(bodies[0])).toBe("はい");
+    expect(geminiText(bodies[0])).toBe("### DIRECTOR'S NOTES\nSpeak naturally and clearly.\n\n#### TRANSCRIPT\nはい");
   });
 
   it("sends the character and the emotion as director's notes before the transcript", async () => {

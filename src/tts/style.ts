@@ -26,6 +26,3 @@ export function styleInstruction(options: StyleOptions, emotion: Emotion): strin
   const style = options.emotionInstructions?.[emotion] ?? DEFAULT_EMOTION_STYLES[emotion];
   return options.instructions ? `${options.instructions}\n${style}` : style;
 }
-
-/** Whether the options ask for a speaking style at all (beyond the defaults). */
-export const hasStyle = (options: StyleOptions): boolean => options.instructions !== undefined || options.emotionInstructions !== undefined;

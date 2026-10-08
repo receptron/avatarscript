@@ -1,24 +1,26 @@
 // Gemini text-to-speech. It returns audio only; timing comes from forced alignment.
 // https://ai.google.dev/gemini-api/docs/speech-generation
 //
-// Without `instructions` or `emotionInstructions` only the text is sent. With them the prompt
-// takes MulmoCast's "### DIRECTOR'S NOTES" / "#### TRANSCRIPT" form, which was never read aloud in
-// 40 measured requests (34 on gemini-2.5-flash-preview-tts, 6 on gemini-3.8-flash-tts; 2026-10-07).
-// Other forms were read aloud on gemini-3.8-flash-tts ("Say cheerfully: …", a bare "TRANSCRIPT:"
-// preamble), and systemInstruction is rejected. Speech that still includes the notes is caught by
-// the mismatch check in createTts().
+// The text is always sent after director's notes, MulmoCast's "### DIRECTOR'S NOTES" /
+// "#### TRANSCRIPT" form: the character from `instructions`, if any, and the style of the line's
+// emotion. It was never read aloud in 84 measured requests on gemini-2.5-flash-preview-tts and
+// gemini-3.8-flash-tts (2026-10-07). Text sent alone fails on gemini-2.5-flash-preview-tts when it
+// is a question ("Model tried to generate text": the model answers it). Other forms were read
+// aloud on gemini-3.8-flash-tts ("Say cheerfully: …", a bare "TRANSCRIPT:" preamble), and
+// systemInstruction is rejected. Speech that still includes the notes is caught by the mismatch
+// check in createTts().
 import { z } from "zod";
 import { fromWav, s16leToFloat } from "../audio.ts";
 import { check, parseJson } from "../json.ts";
-import { hasStyle, StyleOptionsShape, styleInstruction } from "./style.ts";
+import { StyleOptionsShape, styleInstruction } from "./style.ts";
 import type { NativeSpeech, ProviderDefinition, ProviderSettings, SpeechRequest } from "./types.ts";
 
 /** `options` for the gemini provider. */
 const OptionsSchema = z.strictObject(StyleOptionsShape);
 
-/** The prompt: the text alone, or the text after director's notes when there is a style. */
-export function geminiPrompt(text: string, notes: string | null): string {
-  return notes === null ? text : `### DIRECTOR'S NOTES\n${notes}\n\n#### TRANSCRIPT\n${text}`;
+/** The prompt: the text after director's notes. */
+export function geminiPrompt(text: string, notes: string): string {
+  return `### DIRECTOR'S NOTES\n${notes}\n\n#### TRANSCRIPT\n${text}`;
 }
 
 /** Overload answers (gemini-3.8-flash-tts returns 503 now and then) are retried after these waits. */
@@ -41,11 +43,10 @@ export function decodeGeminiAudio(mimeType: string, data: Buffer): NativeSpeech 
 
 function synthesizer(settings: ProviderSettings): (req: SpeechRequest) => Promise<NativeSpeech> {
   const options = check(OptionsSchema, settings.options, "gemini options");
-  const styled = hasStyle(options);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(settings.model)}:generateContent`;
   return async (req) => {
     const body = JSON.stringify({
-      contents: [{ parts: [{ text: geminiPrompt(req.text, styled ? styleInstruction(options, req.emotion) : null) }] }],
+      contents: [{ parts: [{ text: geminiPrompt(req.text, styleInstruction(options, req.emotion)) }] }],
       generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice } } } },
     });
     const post = () => fetch(url, { method: "POST", headers: { "x-goog-api-key": settings.apiKey, "content-type": "application/json" }, body });

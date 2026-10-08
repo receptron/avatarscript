@@ -124,7 +124,7 @@ does not change when the provider or model does:
   |---|---|---|---|---|
   | `elevenlabs` | `ELEVENLABS_API_KEY` | ElevenLabs', corrected against the audio | v3 audio tags | `emotionTags`, `seed` |
   | `openai` | `OPENAI_API_KEY` | forced alignment | `instructions` (gpt-4o-mini-tts) | `instructions`, `emotionInstructions`, `speed` |
-  | `gemini` | `GEMINI_API_KEY` | forced alignment | director's notes, when a style is given | `instructions`, `emotionInstructions` |
+  | `gemini` | `GEMINI_API_KEY` | forced alignment | director's notes | `instructions`, `emotionInstructions` |
   | `mock` | — | exact, made up | — | — |
 
 - OpenAI and Gemini return audio only. Since the text is known, its timing is found by **forced
@@ -138,9 +138,9 @@ does not change when the provider or model does:
 - **Speaking style** (openai, gemini): `instructions` describes the character for every line
   ("You are an energetic 7-year-old boy. Use a high-pitched young child's voice."), and is followed
   by a style for the line's emotion — a default, or your own from `emotionInstructions`
-  (`{ "happy": "…" }`). OpenAI always gets the emotion's style. Gemini gets the text alone unless
-  one of the two options is set; then the prompt is `### DIRECTOR'S NOTES` (the style) followed by
-  `#### TRANSCRIPT` (the text), a form Gemini follows without reading it aloud.
+  (`{ "happy": "…" }`). Gemini's prompt is always `### DIRECTOR'S NOTES` (the style) followed by
+  `#### TRANSCRIPT` (the text), a form Gemini follows without reading it aloud; text sent alone
+  fails on `gemini-2.5-flash-preview-tts` when it is a question.
 - Speech that does not say the text — a provider reading extra words, such as its instructions —
   is detected from the alignment, requested once more, and otherwise reported as an error.
 - Gemini requests answered with 503 or 429 (an overloaded model) are retried three times, after
