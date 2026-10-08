@@ -3,36 +3,26 @@
 import { z } from "zod";
 import { s16leToFloat } from "../audio.ts";
 import { check } from "../json.ts";
-import { EMOTIONS, type Emotion } from "../script.ts";
+import { StyleOptionsShape, styleInstruction } from "./style.ts";
 import type { NativeSpeech, ProviderDefinition, ProviderSettings, SpeechRequest } from "./types.ts";
 
 const SAMPLE_RATE = 24000; // response_format "pcm": 24 kHz 16-bit mono
 
 /** `options` for the openai provider. */
 const OptionsSchema = z.strictObject({
-  /** emotion → spoken-style instruction (models that take instructions: gpt-4o-mini-tts and later) */
-  emotionInstructions: z.partialRecord(z.enum(EMOTIONS), z.string()).optional(),
+  /** `instructions` and `emotionInstructions`: used by models that take instructions (gpt-4o-mini-tts and later) */
+  ...StyleOptionsShape,
   /** 0.25–4.0 */
   speed: z.number().min(0.25).max(4).optional(),
 });
 
-const DEFAULT_INSTRUCTIONS: Record<Emotion, string> = {
-  neutral: "Speak naturally and clearly.",
-  happy: "Speak warmly and cheerfully.",
-  sad: "Speak softly, with a sad tone.",
-  angry: "Speak with an irritated, angry tone.",
-  surprised: "Speak with surprise and excitement.",
-  relaxed: "Speak in a calm, relaxed way.",
-};
-
 function synthesizer(settings: ProviderSettings): (req: SpeechRequest) => Promise<NativeSpeech> {
   const options = check(OptionsSchema, settings.options, "openai options");
-  const instructions = { ...DEFAULT_INSTRUCTIONS, ...options.emotionInstructions };
   // tts-1 / tts-1-hd take no instructions
   const takesInstructions = !settings.model.startsWith("tts-1");
   return async (req) => {
     const body: Record<string, unknown> = { model: settings.model, voice: settings.voice, input: req.text, response_format: "pcm" };
-    if (takesInstructions) body.instructions = instructions[req.emotion];
+    if (takesInstructions) body.instructions = styleInstruction(options, req.emotion);
     if (options.speed !== undefined) body.speed = options.speed;
     const res = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",

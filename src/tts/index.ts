@@ -11,7 +11,15 @@ import { elevenLabsProvider } from "./elevenlabs.ts";
 import { geminiProvider } from "./gemini.ts";
 import { mockProvider } from "./mock.ts";
 import { openAiProvider } from "./openai.ts";
-import type { NativeSpeech, ProviderDefinition, Speech, SpeechRequest, TextToSpeech, TimingSource } from "./types.ts";
+import {
+  VoiceSettingsShape,
+  type NativeSpeech,
+  type ProviderDefinition,
+  type Speech,
+  type SpeechRequest,
+  type TextToSpeech,
+  type TimingSource,
+} from "./types.ts";
 
 export type { Speech, SpeechRequest, TextToSpeech } from "./types.ts";
 
@@ -36,14 +44,9 @@ const DEFINITIONS: Record<TtsProvider, ProviderDefinition> = {
 
 export const TtsConfigSchema = z.strictObject({
   provider: z.enum(TTS_PROVIDERS),
-  /** provider's model; default: the provider's recommended one */
-  model: z.string().min(1).optional(),
-  /** provider's voice id; default: one of the provider's stock voices */
-  voice: z.string().min(1).optional(),
+  ...VoiceSettingsShape,
   /** default: the provider's environment variable (ELEVENLABS_API_KEY, …) */
   apiKey: z.string().min(1).optional(),
-  /** provider-specific options, checked by the provider */
-  options: z.record(z.string(), z.unknown()).optional(),
   /** cache synthesized speech here, keyed by everything that changes it */
   cacheDir: z.string().min(1).optional(),
 });

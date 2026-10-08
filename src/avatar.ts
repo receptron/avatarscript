@@ -7,6 +7,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { parseJson } from "./json.ts";
+import { VoiceSettingsShape } from "./tts/types.ts";
 
 export const AvatarManifestSchema = z.object({
   format: z.literal("avatarscript-avatar/1"),
@@ -15,8 +16,8 @@ export const AvatarManifestSchema = z.object({
   /** folder the asset paths are relative to, relative to the manifest */
   root: z.string().optional(),
   assets: z.object({ rig: z.string(), layers: z.string(), sprites: z.string().optional() }),
-  /** default voice and model per text-to-speech provider: { "elevenlabs": { "voice": "…", "model": "…" } } */
-  voice: z.record(z.string(), z.object({ voice: z.string().optional(), model: z.string().optional() })).optional(),
+  /** default voice, model and options per text-to-speech provider: { "gemini": { "voice": "…", "options": { "instructions": "…" } } } */
+  voice: z.record(z.string(), z.object(VoiceSettingsShape)).optional(),
   license: z.object({ attribution: z.string().optional(), terms: z.string().optional() }).optional(),
 });
 export type AvatarManifest = z.infer<typeof AvatarManifestSchema>;

@@ -3,8 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toWav } from "../src/audio.ts";
-import { decodeGeminiAudio } from "../src/tts/gemini.ts";
+import { decodeGeminiAudio, geminiPrompt, geminiProvider } from "../src/tts/gemini.ts";
 import { createTts, normalizeSpeech, SPEECH_SAMPLE_RATE } from "../src/tts/index.ts";
+import { openAiProvider } from "../src/tts/openai.ts";
+import type { ProviderDefinition, SpeechRequest } from "../src/tts/types.ts";
 
 const request = { text: "はい", lang: "ja", emotion: "neutral" } as const;
 
@@ -95,5 +97,96 @@ describe("decodeGeminiAudio", () => {
     const pcm = toWav({ samples, sampleRate: 24000 }).subarray(44);
     expect(decodeGeminiAudio("audio/L16;codec=pcm;rate=24000", pcm).sampleRate).toBe(24000);
     expect(() => decodeGeminiAudio("audio/mpeg", pcm)).toThrow("unexpected audio");
+  });
+});
+
+// Each provider's request body, with fetch stubbed: no API is called.
+const CHILD = "You are an energetic 7-year-old boy.";
+const pcmResponse = () => new Response(new Uint8Array(4));
+const geminiResponse = () =>
+  new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/L16;rate=24000", data: "AAAAAA==" } }] } }] }));
+
+function stubFetch(...responses: (() => Response)[]) {
+  const bodies: unknown[] = [];
+  let calls = 0;
+  vi.stubGlobal("fetch", (_url: string, init: { body: string }) => {
+    bodies.push(JSON.parse(init.body));
+    const respond = responses[Math.min(calls++, responses.length - 1)];
+    return Promise.resolve(respond());
+  });
+  return bodies;
+}
+
+const speak = (provider: ProviderDefinition, options: Record<string, unknown>, req: SpeechRequest = request, model = provider.defaultModel) =>
+  provider.create({ apiKey: "k", model, voice: "v", options })(req);
+
+const geminiText = (body: unknown) => (body as { contents: { parts: { text: string }[] }[] }).contents[0].parts[0].text;
+
+describe("gemini speaking style", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("sends the text alone when no style is given", async () => {
+    const bodies = stubFetch(geminiResponse);
+    await speak(geminiProvider, {});
+    expect(geminiText(bodies[0])).toBe("はい");
+  });
+
+  it("sends the character and the emotion as director's notes before the transcript", async () => {
+    const bodies = stubFetch(geminiResponse);
+    await speak(geminiProvider, { instructions: CHILD }, { ...request, emotion: "happy" });
+    expect(geminiText(bodies[0])).toBe(`### DIRECTOR'S NOTES\n${CHILD}\nSpeak warmly and cheerfully.\n\n#### TRANSCRIPT\nはい`);
+  });
+
+  it("takes per-emotion styles, alone or with a character", async () => {
+    const bodies = stubFetch(geminiResponse);
+    await speak(geminiProvider, { emotionInstructions: { sad: "Sniffle." } }, { ...request, emotion: "sad" });
+    expect(geminiText(bodies[0])).toBe(geminiPrompt("はい", "Sniffle."));
+  });
+
+  it("checks its options", () => {
+    expect(() => createTts({ provider: "gemini", apiKey: "k", options: { instruction: CHILD } })).toThrow("gemini options is not valid");
+    expect(() => createTts({ provider: "gemini", apiKey: "k", options: { instructions: "" } })).toThrow("gemini options is not valid");
+  });
+
+  it("retries an overloaded model, then gives up", async () => {
+    vi.useFakeTimers();
+    const overloaded = () => new Response("overloaded", { status: 503 });
+    const bodies = stubFetch(overloaded, overloaded, geminiResponse);
+    const speech = speak(geminiProvider, {});
+    await vi.runAllTimersAsync();
+    expect((await speech).sampleRate).toBe(24000);
+    expect(bodies).toHaveLength(3);
+
+    const always = stubFetch(overloaded);
+    const failed = expect(speak(geminiProvider, {})).rejects.toThrow("Gemini request failed (503): overloaded");
+    await vi.runAllTimersAsync();
+    await failed;
+    expect(always).toHaveLength(4);
+  });
+
+  it("does not retry a request the model refuses", async () => {
+    const bodies = stubFetch(() => new Response("bad", { status: 400 }));
+    await expect(speak(geminiProvider, {})).rejects.toThrow("Gemini request failed (400)");
+    expect(bodies).toHaveLength(1);
+  });
+});
+
+describe("openai speaking style", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("puts the character before the emotion's style, or the style alone", async () => {
+    const bodies = stubFetch(pcmResponse);
+    await speak(openAiProvider, { instructions: CHILD }, { ...request, emotion: "surprised" });
+    await speak(openAiProvider, { emotionInstructions: { neutral: "Flat." } });
+    expect(bodies.map((b) => (b as { instructions: string }).instructions)).toEqual([`${CHILD}\nSpeak with surprise and excitement.`, "Flat."]);
+  });
+
+  it("sends no instructions to models that take none", async () => {
+    const bodies = stubFetch(pcmResponse);
+    await speak(openAiProvider, { instructions: CHILD }, request, "tts-1");
+    expect(bodies[0]).not.toHaveProperty("instructions");
   });
 });
