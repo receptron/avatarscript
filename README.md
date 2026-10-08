@@ -123,8 +123,8 @@ does not change when the provider or model does:
   | provider | key | timing | voice emotion | options |
   |---|---|---|---|---|
   | `elevenlabs` | `ELEVENLABS_API_KEY` | ElevenLabs', corrected against the audio | v3 audio tags | `emotionTags`, `seed` |
-  | `openai` | `OPENAI_API_KEY` | forced alignment | `instructions` (gpt-4o-mini-tts) | `emotionInstructions`, `speed` |
-  | `gemini` | `GEMINI_API_KEY` | forced alignment | none: only the text is sent | — |
+  | `openai` | `OPENAI_API_KEY` | forced alignment | `instructions` (gpt-4o-mini-tts) | `instructions`, `emotionInstructions`, `speed` |
+  | `gemini` | `GEMINI_API_KEY` | forced alignment | director's notes | `instructions`, `emotionInstructions` |
   | `mock` | — | exact, made up | — | — |
 
 - OpenAI and Gemini return audio only. Since the text is known, its timing is found by **forced
@@ -135,12 +135,29 @@ does not change when the provider or model does:
   error 19 ms (one model frame is 20 ms); 79% (Japanese) and 91% (English) of characters within 50 ms.
 - The model (635 MB) is downloaded once from Hugging Face into `~/.cache/avatarscript/models`
   (or `AVATARSCRIPT_MODEL_DIR`). Audio and text never leave the machine for alignment.
-- Speech that does not say the text — a provider reading extra words — is detected from the
-  alignment, requested once more, and otherwise reported as an error. (Gemini models read style
-  instructions aloud when they are written into the prompt, which is why only the text is sent.)
+- **Speaking style** (openai, gemini): `instructions` describes the character for every line
+  ("You are an energetic 7-year-old boy. Use a high-pitched young child's voice."), and is followed
+  by a style for the line's emotion — a default, or your own from `emotionInstructions`
+  (`{ "happy": "…" }`). Gemini's prompt is always `### DIRECTOR'S NOTES` (the style) followed by
+  `#### TRANSCRIPT` (the text), a form Gemini follows without reading it aloud; text sent alone
+  fails on `gemini-2.5-flash-preview-tts` when it is a question.
+- Speech that does not say the text — a provider reading extra words, such as its instructions —
+  is detected from the alignment, requested once more, and otherwise reported as an error.
+- Gemini requests answered with 503 or 429 (an overloaded model) are retried three times, after
+  1, 2 and 4 seconds.
 
-An avatar can name its default voice per provider in `avatar.json`:
-`"voice": { "elevenlabs": { "voice": "<voice id>", "model": "eleven_v3" } }`.
+An avatar can name its default voice, model and provider options per provider in `avatar.json`,
+so a character's speaking style travels with it:
+
+```json
+"voice": {
+  "gemini": { "voice": "Puck", "options": { "instructions": "You are an energetic 7-year-old boy…" } },
+  "openai": { "voice": "verse", "options": { "instructions": "…", "emotionInstructions": { "happy": "…" } } },
+  "elevenlabs": { "voice": "<voice id>", "model": "eleven_v3" }
+}
+```
+
+The CLI's `--voice` and `--model` override the avatar's; its options are used as they are.
 
 ## Scripts
 

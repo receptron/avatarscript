@@ -43,13 +43,23 @@ export function voicedFrames(samples: Float32Array, sampleRate: number): boolean
 
 /**
  * Ends each spoken character that comes before a space, punctuation or the end of the text where
- * the voice stops: an aligner tends to stretch the last sound of a phrase into the silence after it.
+ * the voice stops. An aligner tends to stretch the last sound of a phrase into the silence after
+ * it, and to cut a held one short (a long, sad "の？" sounds 0.5 s past its aligned end): the
+ * character is trimmed to the voice, or extended over voice that runs on from it without a pause,
+ * up to the next spoken character.
  */
 export function trimToVoice(chars: string[], timing: CharTime[], samples: Float32Array, sampleRate: number): CharTime[] {
   const loud = voicedFrames(samples, sampleRate);
   return timing.map((t, k) => {
     if (!isSpoken(chars[k]) || isSpoken(chars[k + 1] ?? " ")) return t;
-    let last = Math.min(loud.length, Math.ceil(t.end / FRAME)) - 1;
+    const endFrame = Math.min(loud.length, Math.ceil(t.end / FRAME));
+    if (endFrame > 0 && loud[endFrame - 1]) {
+      const next = timing.find((n, j) => j > k && isSpoken(chars[j]))?.start ?? Infinity;
+      let held = endFrame;
+      while (held < loud.length && loud[held] && (held + 1) * FRAME <= next) held++;
+      return { start: t.start, end: Math.max(t.end, held * FRAME) };
+    }
+    let last = endFrame - 1;
     while (last >= 0 && !loud[last] && (last + 1) * FRAME > t.start + MIN_VOICE) last--;
     return { start: t.start, end: Math.max(t.start + MIN_VOICE, Math.min(t.end, (last + 1) * FRAME)) };
   });

@@ -1,5 +1,16 @@
+import { z } from "zod";
 import type { CharTime } from "../g2p/types.ts";
 import type { Emotion } from "../script.ts";
+
+/** How one provider speaks: in createTts()'s config, and per provider in avatar.json's `voice`. */
+export const VoiceSettingsShape = {
+  /** provider's model; default: the provider's recommended one */
+  model: z.string().min(1).optional(),
+  /** provider's voice id; default: one of the provider's stock voices */
+  voice: z.string().min(1).optional(),
+  /** provider-specific options, checked by the provider */
+  options: z.record(z.string(), z.unknown()).optional(),
+};
 
 /** One piece of text to speak. */
 export interface SpeechRequest {

@@ -23,6 +23,7 @@ Speech (make, compile):
                            GEMINI_API_KEY), or mock (offline buzz, no key)
   --voice <id>             the provider's voice (default: avatar.json, then a stock voice)
   --model <id>             the provider's model (default: avatar.json, then the provider's default)
+                           (provider options, such as a speaking style, come from avatar.json)
   --lang <code>            language of the text (default: front matter, then detected)
 
 Video (make, render):
@@ -90,9 +91,9 @@ const num = (name: "fps" | "seed", fallback: number) => {
 function textToSpeech(avatar: Avatar, cacheDir: string): TextToSpeech {
   const provider = need("tts");
   if (!isTtsProvider(provider)) throw new Error(`unknown --tts "${provider}" (use ${TTS_PROVIDERS.join(" or ")})`);
-  // avatar.json can name a default voice and model per provider
+  // avatar.json can name a default voice, model and options (speaking style) per provider
   const preset = avatar.manifest.voice?.[provider] ?? {};
-  return createTts({ provider, model: args.model ?? preset.model, voice: args.voice ?? preset.voice, cacheDir });
+  return createTts({ provider, model: args.model ?? preset.model, voice: args.voice ?? preset.voice, options: preset.options, cacheDir });
 }
 
 async function loadScript(path: string): Promise<Script> {

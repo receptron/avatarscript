@@ -1,13 +1,31 @@
 // Gemini text-to-speech. It returns audio only; timing comes from forced alignment.
 // https://ai.google.dev/gemini-api/docs/speech-generation
 //
-// Only the text is sent. Gemini TTS models read a style instruction aloud when it is written into
-// the prompt ("Say cheerfully: …", or a "TRANSCRIPT:" preamble — both measured on
-// gemini-3.8-flash-tts) and reject systemInstruction, so emotion is shown on the face only.
+// The text is always sent after director's notes, MulmoCast's "### DIRECTOR'S NOTES" /
+// "#### TRANSCRIPT" form: the character from `instructions`, if any, and the style of the line's
+// emotion. It was never read aloud in 84 measured requests on gemini-2.5-flash-preview-tts and
+// gemini-3.8-flash-tts (2026-10-07). Text sent alone fails on gemini-2.5-flash-preview-tts when it
+// is a question ("Model tried to generate text": the model answers it). Other forms were read
+// aloud on gemini-3.8-flash-tts ("Say cheerfully: …", a bare "TRANSCRIPT:" preamble), and
+// systemInstruction is rejected. Speech that still includes the notes is caught by the mismatch
+// check in createTts().
 import { z } from "zod";
 import { fromWav, s16leToFloat } from "../audio.ts";
-import { parseJson } from "../json.ts";
+import { check, parseJson } from "../json.ts";
+import { StyleOptionsShape, styleInstruction } from "./style.ts";
 import type { NativeSpeech, ProviderDefinition, ProviderSettings, SpeechRequest } from "./types.ts";
+
+/** `options` for the gemini provider. */
+const OptionsSchema = z.strictObject(StyleOptionsShape);
+
+/** The prompt: the text after director's notes. */
+export function geminiPrompt(text: string, notes: string): string {
+  return `### DIRECTOR'S NOTES\n${notes}\n\n#### TRANSCRIPT\n${text}`;
+}
+
+/** Overload answers (gemini-3.8-flash-tts returns 503 now and then) are retried after these waits. */
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
+const RETRY_STATUS = new Set([429, 503]);
 
 const ResponseSchema = z.object({
   candidates: z
@@ -24,16 +42,21 @@ export function decodeGeminiAudio(mimeType: string, data: Buffer): NativeSpeech 
 }
 
 function synthesizer(settings: ProviderSettings): (req: SpeechRequest) => Promise<NativeSpeech> {
+  const options = check(OptionsSchema, settings.options, "gemini options");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(settings.model)}:generateContent`;
   return async (req) => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(settings.model)}:generateContent`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "x-goog-api-key": settings.apiKey, "content-type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: req.text }] }],
-        generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice } } } },
-      }),
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: geminiPrompt(req.text, styleInstruction(options, req.emotion)) }] }],
+      generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice } } } },
     });
+    const post = () => fetch(url, { method: "POST", headers: { "x-goog-api-key": settings.apiKey, "content-type": "application/json" }, body });
+    let res = await post();
+    for (const delay of RETRY_DELAYS_MS) {
+      if (!RETRY_STATUS.has(res.status)) break;
+      await res.body?.cancel();
+      await new Promise((done) => setTimeout(done, delay));
+      res = await post();
+    }
     if (!res.ok) throw new Error(`Gemini request failed (${res.status}): ${(await res.text()).slice(0, 500)}`);
     const json = parseJson(ResponseSchema, await res.text(), "Gemini response");
     const audio = json.candidates[0].content.parts.find((p) => p.inlineData)?.inlineData;

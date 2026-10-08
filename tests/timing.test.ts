@@ -73,6 +73,27 @@ describe("refineTiming", () => {
     expect(out[4].end).toBeCloseTo(1.1, 2);
   });
 
+  it("extends a held sound over the voice that runs on from it, up to the next character", () => {
+    // the aligner cut "b" and "d" short, though the voice holds them to 0.50 and 1.10
+    const timing = [
+      { start: 0.1, end: 0.2 },
+      { start: 0.2, end: 0.3 },
+      { start: 0.3, end: 0.45 },
+      { start: 0.45, end: 0.8 },
+      { start: 0.8, end: 0.9 },
+    ];
+    const out = trimToVoice([..."ab、cd"], timing, audio, RATE);
+    expect(out[1].end).toBeCloseTo(0.45, 2); // stops at "c", which starts inside the voice
+    expect(out[4].end).toBeCloseTo(1.1, 2);
+    expect(out[0]).toEqual(timing[0]);
+  });
+
+  it("does not carry a held sound across a pause", () => {
+    // "a" ends inside the first span; the voice after the pause is not part of it
+    const out = trimToVoice(["a"], [{ start: 0.1, end: 0.3 }], audio, RATE);
+    expect(out[0].end).toBeCloseTo(0.5, 2);
+  });
+
   it("leaves timing alone for silent audio", () => {
     const timing = [{ start: 0, end: 0.1 }];
     expect(refineTiming(["a"], timing, new Float32Array(800), RATE)).toBe(timing);

@@ -4,7 +4,8 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { loadAvatar } from "../src/avatar.ts";
+import { AvatarManifestSchema, loadAvatar } from "../src/avatar.ts";
+import { check } from "../src/json.ts";
 
 // Serves avatars/ani over HTTP, with per-test overrides, and counts requests per path.
 const ANI = resolve(import.meta.dirname, "../avatars/ani");
@@ -142,5 +143,18 @@ describe("loadAvatar", () => {
     fresh();
     await expect(loadAvatar(`${base}/nothing/`, { cacheDir })).rejects.toThrow("is not an avatar");
     await expect(loadAvatar("ftp://example.com/ani/", { cacheDir })).rejects.toThrow("only http and https");
+  });
+});
+
+describe("avatar.json voice", () => {
+  const manifest = (voice: unknown) => ({ format: "avatarscript-avatar/1", name: "x", runtime: "mesh-avatar/1", assets: { rig: "r", layers: "l" }, voice });
+
+  it("carries provider options, such as a speaking style, with the voice", () => {
+    const voice = { gemini: { voice: "Puck", model: "gemini-2.5-flash-preview-tts", options: { instructions: "You are a boy." } } };
+    expect(check(AvatarManifestSchema, manifest(voice), "avatar.json").voice).toEqual(voice);
+  });
+
+  it("rejects options that are not an object", () => {
+    expect(() => check(AvatarManifestSchema, manifest({ gemini: { options: "loud" } }), "avatar.json")).toThrow("avatar.json is not valid");
   });
 });
