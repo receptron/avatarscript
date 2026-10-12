@@ -73,6 +73,7 @@
     "eslint-plugin-security": "^4.2.0",
     "eslint-plugin-sonarjs": "^4.2.2",
     "globals": "^17.13.0",
+    "mesh-avatar": "0.1.1",
     "onnxruntime-node": "^1.30.0",
     "prettier": "^3.9.9",
     "typescript": "~6.0.2",

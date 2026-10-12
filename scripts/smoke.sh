@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Package smoke test: pack the exact tarball (prepack builds dist/ and bundles the engine),
-# install it into an empty folder with no mesh-avatar-studio checkout and no esbuild beside it,
+# install it into an empty folder with no mesh-avatar package and no esbuild beside it,
 # and make a video through both the CLI and the library with the offline mock voice.
 # Then check the video is real: an H.264 + AAC MP4 of the expected length whose frames show
 # the avatar, not a blank canvas.
@@ -20,8 +20,8 @@ npm init -y >/dev/null
 npm pkg set type=module
 npm install --no-audit --no-fund "$WORK/$TGZ" >/dev/null
 
-if [ -e node_modules/esbuild ]; then
-  echo "esbuild was installed with the package; the engine must come prebuilt"; exit 1
+if [ -e node_modules/esbuild ] || [ -e node_modules/mesh-avatar ]; then
+  echo "esbuild or mesh-avatar was installed with the package; the engine must come prebuilt"; exit 1
 fi
 
 printf '[emotion:happy] こんにちは！<nod> Hello from the package.\n' > story.avs

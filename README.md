@@ -8,7 +8,7 @@ avatar package + text ──► AvatarScript (.avs) ──► compiler + TTS ─
 
 AvatarScript defines a standard avatar package, a script language for directing an avatar's
 speech, emotion and gestures, and a compiler and renderer that produce the video. The first
-runtime is the mesh avatar engine from
+runtime is the mesh avatar engine, [mesh-avatar](https://www.npmjs.com/package/mesh-avatar) from
 [mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio).
 See [PLAN.md](PLAN.md) for the design and milestones.
 
@@ -238,9 +238,11 @@ a font file always works.
 
 ## Develop
 
-Clone [mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio) next to this
-repository: running from source (`node src/cli.ts …`) bundles the engine from that checkout
-(or from `--engine <dir>` / `AVATARSCRIPT_MESH_ENGINE`).
+Running from source (`node src/cli.ts …`) bundles the engine from the
+[mesh-avatar](https://www.npmjs.com/package/mesh-avatar) development dependency, pinned to an
+exact version in package.json. To try engine changes before they are published, point
+`--engine <dir>` / `AVATARSCRIPT_MESH_ENGINE` at a
+[mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio) checkout.
 
 ```sh
 npm install
@@ -248,19 +250,20 @@ npm run format     # Prettier
 npm run lint       # ESLint, including type-aware rules
 npm test
 npm run typecheck
-npm run build      # dist/, including the engine bundled from ../mesh-avatar-studio
+npm run build      # dist/, including the engine bundled from mesh-avatar
 scripts/smoke.sh avatars/ani   # pack, install, render (as CI does)
 ```
 
 CI (`.github/workflows/ci.yml`) runs Prettier, ESLint, the typecheck and build, the tests on Ubuntu and macOS,
-and the package smoke above, against a pinned mesh-avatar-studio commit.
+and the package smoke above.
 
-`npm run build` records the engine's source commit in `dist/engine/source.json`.
+`npm run build` records the engine's package version in `dist/engine/source.json`.
 
 ## License
 
-[MIT](LICENSE). The bundled mesh avatar engine (`dist/engine/`) is from
+[MIT](LICENSE). The bundled mesh avatar engine (`dist/engine/`) is
+[mesh-avatar](https://www.npmjs.com/package/mesh-avatar) from
 [mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio), MIT License,
-© Yuki Shindo; its license is included as `dist/engine/LICENSE.mesh-avatar-studio`. The
+© Yuki Shindo; its license is included as `dist/engine/LICENSE.mesh-avatar`. The
 sample avatar `avatars/ani` (illustration and built layers) is © 2026 receptron, under the same
 MIT License.

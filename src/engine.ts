@@ -1,6 +1,6 @@
-// The mesh avatar engine (from mesh-avatar-studio) as one script for the render page.
-// Packages ship it prebuilt in dist/engine/; a source checkout bundles it from a
-// mesh-avatar-studio checkout next to this repository.
+// The mesh avatar engine (the mesh-avatar package, from mesh-avatar-studio) as one script for the
+// render page. Packages ship it prebuilt in dist/engine/; a source checkout bundles it from the
+// mesh-avatar development dependency, or from a mesh-avatar-studio checkout when one is named.
 import { readFile, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 /** Where `npm run build` writes the bundled engine (dist/engine/ next to dist/engine.js). */
 export const BUNDLED_ENGINE = resolve(here, "engine/mesh-engine.js");
+/** The engine's entry in a mesh-avatar-studio checkout. */
+const CHECKOUT_ENTRY = "packages/runtime/src/index.ts";
 
 const exists = (p: string) =>
   stat(p).then(
@@ -15,20 +17,33 @@ const exists = (p: string) =>
     () => false,
   );
 
-export async function findEngineRoot(explicit?: string): Promise<string> {
-  const root = resolve(explicit ?? process.env.AVATARSCRIPT_MESH_ENGINE ?? resolve(here, "../../mesh-avatar-studio"));
-  const entry = resolve(root, "src/engine/index.ts");
-  if (!(await exists(entry))) {
-    throw new Error(`mesh engine not found at ${entry}. Clone mesh-avatar-studio next to this repository, or pass --engine / set AVATARSCRIPT_MESH_ENGINE.`);
-  }
-  return root;
+/** Where the engine is bundled from: the installed mesh-avatar package, or a checkout's runtime source. */
+export interface EngineSource {
+  entry: string;
+  /** the folder holding the engine's LICENSE */
+  root: string;
 }
 
-/** Bundles the engine from a mesh-avatar-studio checkout (esbuild is a development dependency). */
-export async function bundleEngine(root: string): Promise<string> {
+/** The installed mesh-avatar package (a development dependency: packages ship the engine bundled). */
+export function packageEngine(): EngineSource {
+  // import.meta.resolve: the package exports only an `import` condition
+  const entry = fileURLToPath(import.meta.resolve("mesh-avatar"));
+  return { entry, root: resolve(dirname(entry), "..") };
+}
+
+/** A mesh-avatar-studio checkout, for trying engine changes before they are published. */
+export async function checkoutEngine(root: string): Promise<EngineSource> {
+  const entry = resolve(root, CHECKOUT_ENTRY);
+  if (!(await exists(entry)))
+    throw new Error(`mesh engine not found at ${entry}: --engine / AVATARSCRIPT_MESH_ENGINE must name a mesh-avatar-studio checkout.`);
+  return { entry, root: resolve(root, "packages/runtime") };
+}
+
+/** Bundles the engine into one script that sets `window.MeshAvatarEngine` (esbuild is a development dependency). */
+export async function bundleEngine(source: EngineSource): Promise<string> {
   const { build } = await import("esbuild");
   const result = await build({
-    entryPoints: [resolve(root, "src/engine/index.ts")],
+    entryPoints: [source.entry],
     bundle: true,
     write: false,
     format: "iife",
@@ -40,12 +55,12 @@ export async function bundleEngine(root: string): Promise<string> {
 }
 
 /**
- * The engine script. An explicit checkout (option or AVATARSCRIPT_MESH_ENGINE) wins; otherwise
- * the bundled copy, otherwise the checkout next to this repository.
+ * The engine script. A named checkout (option or AVATARSCRIPT_MESH_ENGINE) wins; otherwise the
+ * bundled copy, otherwise the installed mesh-avatar package.
  */
 export async function loadEngine(explicitRoot?: string): Promise<string> {
-  if (!explicitRoot && !process.env.AVATARSCRIPT_MESH_ENGINE && (await exists(BUNDLED_ENGINE))) {
-    return readFile(BUNDLED_ENGINE, "utf8");
-  }
-  return bundleEngine(await findEngineRoot(explicitRoot));
+  const root = explicitRoot ?? process.env.AVATARSCRIPT_MESH_ENGINE;
+  if (root) return bundleEngine(await checkoutEngine(root));
+  if (await exists(BUNDLED_ENGINE)) return readFile(BUNDLED_ENGINE, "utf8");
+  return bundleEngine(packageEngine());
 }
