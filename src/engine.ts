@@ -8,8 +8,14 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 /** Where `npm run build` writes the bundled engine (dist/engine/ next to dist/engine.js). */
 export const BUNDLED_ENGINE = resolve(here, "engine/mesh-engine.js");
-/** The engine's entry in a mesh-avatar-studio checkout. */
-const CHECKOUT_ENTRY = "packages/runtime/src/index.ts";
+/**
+ * The engine in a mesh-avatar-studio checkout: the runtime package, or the src/engine/ it lived in
+ * before mesh-avatar was published (as at the commit avatarscript 0.4 bundled). `root` holds its LICENSE.
+ */
+const CHECKOUT_LAYOUTS = [
+  { entry: "packages/runtime/src/index.ts", root: "packages/runtime" },
+  { entry: "src/engine/index.ts", root: "." },
+];
 
 const exists = (p: string) =>
   stat(p).then(
@@ -33,10 +39,12 @@ export function packageEngine(): EngineSource {
 
 /** A mesh-avatar-studio checkout, for trying engine changes before they are published. */
 export async function checkoutEngine(root: string): Promise<EngineSource> {
-  const entry = resolve(root, CHECKOUT_ENTRY);
-  if (!(await exists(entry)))
-    throw new Error(`mesh engine not found at ${entry}: --engine / AVATARSCRIPT_MESH_ENGINE must name a mesh-avatar-studio checkout.`);
-  return { entry, root: resolve(root, "packages/runtime") };
+  for (const layout of CHECKOUT_LAYOUTS) {
+    const entry = resolve(root, layout.entry);
+    if (await exists(entry)) return { entry, root: resolve(root, layout.root) };
+  }
+  const tried = CHECKOUT_LAYOUTS.map((l) => resolve(root, l.entry)).join(" or ");
+  throw new Error(`mesh engine not found at ${tried}: --engine / AVATARSCRIPT_MESH_ENGINE must name a mesh-avatar-studio checkout.`);
 }
 
 /** Bundles the engine into one script that sets `window.MeshAvatarEngine` (esbuild is a development dependency). */
