@@ -26,7 +26,7 @@ export interface RenderOptions {
   height?: number;
   /** background and avatar placement over the score's */
   view?: ViewInput;
-  /** mesh-avatar-studio checkout to bundle the engine from, instead of the bundled copy */
+  /** mesh-avatar-studio checkout to bundle the engine from, instead of the bundled mesh-avatar package */
   engineRoot?: string;
   seed?: number;
   /** mouth shapes lead the sound slightly so the smoothed mouth arrives on time, seconds */

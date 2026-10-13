@@ -37,7 +37,7 @@ Video (make, render):
   --seed <n>               randomness of blinks and idle motion (default 1)
   --subtitles              draw subtitles (style from the script's subtitle-* front matter)
   --no-subtitles           do not draw subtitles, even if the script turns them on
-  --engine <dir>           mesh-avatar-studio checkout (default ../mesh-avatar-studio)
+  --engine <dir>           bundle the engine from a mesh-avatar-studio checkout instead
 
 API keys are read from the environment or a .env file.`;
 

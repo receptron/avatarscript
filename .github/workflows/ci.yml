@@ -18,14 +18,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# The mesh avatar engine is bundled from this mesh-avatar-studio commit at build time. Pinned so
-# an upstream change cannot silently change what CI builds and ships; move it on purpose, in a
-# commit of its own, after rendering the examples with the new engine.
+# The mesh avatar engine is bundled at build time from the mesh-avatar development dependency,
+# pinned to an exact version in package.json so an upstream release cannot silently change what CI
+# builds and ships; move it on purpose, in a commit of its own, after rendering the examples with it.
 env:
   # onnxruntime-node's install script fetches its CUDA binaries from NuGet on Linux x64 (hundreds of
   # MB, per install). Alignment runs on the CPU binaries the package already contains.
   ONNXRUNTIME_NODE_INSTALL: skip
-  MESH_AVATAR_STUDIO_REF: 8713e85a00e50f5cdf8fe33294b961d1d6506fc9
 
 # Timeouts are generous: here they also count time spent queued for a runner, and jobs that take
 # a minute were cancelled after 15 minutes of waiting when runners were busy.
@@ -36,28 +35,15 @@ jobs:
     name: Format, lint, typecheck, build
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: avatarscript
     steps:
-      # Side by side, as in development: the build bundles the engine from ../mesh-avatar-studio.
-      # Not nested inside this checkout, where vitest and tsc would pick up its files.
       - uses: actions/checkout@v6
         with:
-          path: avatarscript
-          persist-credentials: false
-      - uses: actions/checkout@v6
-        with:
-          repository: shinshin86/mesh-avatar-studio
-          ref: ${{ env.MESH_AVATAR_STUDIO_REF }}
-          path: mesh-avatar-studio
           persist-credentials: false
 
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: avatarscript/package-lock.json
 
       # PUPPETEER_SKIP_DOWNLOAD: nothing here starts a browser, and Chrome is most of the install.
       - run: npm ci
@@ -80,15 +66,14 @@ jobs:
       - name: Build
         run: npm run build
 
-      # The build must have bundled the pinned engine, not whatever happened to be checked out.
+      # The build must have bundled the version package.json pins, not whatever was installed.
       - name: Check the bundled engine
         run: |
           node -e "
             const s = JSON.parse(require('fs').readFileSync('dist/engine/source.json', 'utf8'));
-            if (s.commit !== process.env.MESH_AVATAR_STUDIO_REF || s.modified) {
-              console.error('bundled engine', s); process.exit(1);
-            }
-            console.log('bundled engine', s.commit);"
+            const pinned = JSON.parse(require('fs').readFileSync('package.json', 'utf8')).devDependencies['mesh-avatar'];
+            if (s.version !== pinned) { console.error('bundled engine', s, 'pinned', pinned); process.exit(1); }
+            console.log('bundled engine', s.package + '@' + s.version);"
 
   # ubuntu + macOS: the unit tests need no browser and no API key (CLAUDE.md), but kuromoji's
   # dictionary loading and path handling are worth running on both platforms the CLI is used on.
@@ -123,34 +108,22 @@ jobs:
 
   # Verifies the published package actually works: scripts/smoke.sh packs the exact tarball
   # (prepack builds dist/ and bundles the engine), installs it into an empty folder with no
-  # mesh-avatar-studio and no esbuild beside it, and renders videos through the CLI and the
+  # mesh-avatar package and no esbuild beside it, and renders videos through the CLI and the
   # library with the offline mock voice, checking codec, length and that the frames are not
   # blank. Run the same script locally before changing packaging or rendering.
   package-smoke:
     name: Package smoke (pack, install, render)
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    defaults:
-      run:
-        working-directory: avatarscript
     steps:
       - uses: actions/checkout@v6
         with:
-          path: avatarscript
-          persist-credentials: false
-      # Also the source of the sample avatar the smoke renders.
-      - uses: actions/checkout@v6
-        with:
-          repository: shinshin86/mesh-avatar-studio
-          ref: ${{ env.MESH_AVATAR_STUDIO_REF }}
-          path: mesh-avatar-studio
           persist-credentials: false
 
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: avatarscript/package-lock.json
 
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg

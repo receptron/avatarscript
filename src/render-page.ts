@@ -19,7 +19,7 @@ export interface FramePlan {
   caption: string | null;
 }
 
-/** The part of the mesh engine's avatar API the renderer drives (mesh-avatar-studio src/engine/index.ts). */
+/** The part of the mesh engine's avatar API the renderer drives (the mesh-avatar package's MeshAvatar). */
 interface MeshAvatarApi {
   readonly motions: { id: string }[];
   setEmotion(tag: string, options: { playMotion: boolean }): void;
