@@ -29,5 +29,5 @@ A default `--avatar`; fetching scripts from URLs (see the issue for why).
 
 ## Verification
 
-Unit tests for `src/examples.ts`; `scripts/smoke.sh avatars/ani` extended to render
-`--script example:hello-ja` from the installed tarball, so the packaging is checked, not assumed.
+Unit tests for `src/examples.ts`; `scripts/smoke.sh avatars/ani` extended to compile
+`--script example:hello-en` from the installed tarball, so the packaging is checked, not assumed.
