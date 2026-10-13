@@ -5,9 +5,9 @@ Working notes for AI coding agents in this repo. What the project is and how to 
 
 ## TypeScript
 
-- **Package manager: npm** (package-lock.json). Add dependencies with `npm install` /
-  `npm install --save-dev`; don't hand-edit the dependency lists in package.json.
-- Run after changes: `npm run format`, `npm run lint`, `npm run typecheck`, `npm test`, and — when packaging, the engine bundle or
+- **Package manager: yarn** (yarn.lock; no package-lock.json). Add dependencies with `yarn add` /
+  `yarn add --dev`; don't hand-edit the dependency lists in package.json.
+- Run after changes: `yarn format`, `yarn lint`, `yarn typecheck`, `yarn test`, and — when packaging, the engine bundle or
   rendering is affected — `scripts/smoke.sh avatars/ani`, the same
   pack-install-render check CI runs (`.github/workflows/ci.yml`).
 - **Type-checking covers the whole repo only if the tsconfig says so.** `tsconfig.json` includes

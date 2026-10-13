@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { toWav } from "./audio.ts";
 import { loadAvatar, type Avatar } from "./avatar.ts";
 import { compile, detectLang } from "./compile.ts";
+import { EXAMPLE_PREFIX, exampleNames, scriptSource } from "./examples.ts";
 import { render } from "./render.ts";
 import { parseJson } from "./json.ts";
 import { ScoreSchema, type Score } from "./score.ts";
@@ -14,8 +15,8 @@ import { parseScript, plainScript, type Script } from "./script.ts";
 import { createTts, isTtsProvider, TTS_PROVIDERS, type TextToSpeech } from "./tts/index.ts";
 
 const USAGE = `Usage:
-  avatarscript make    --avatar <dir|url> --script <file.avs|file.txt> -o <video.mp4|.webm|.mov> [options]
-  avatarscript compile --avatar <dir|url> --script <file.avs|file.txt> -o <name.score.json> [options]
+  avatarscript make    --avatar <dir|url> --script <file.avs|file.txt|example:name> -o <video.mp4|.webm|.mov> [options]
+  avatarscript compile --avatar <dir|url> --script <file.avs|file.txt|example:name> -o <name.score.json> [options]
   avatarscript render  --avatar <dir|url> --score <name.score.json> -o <video.mp4> [options]
 
 Speech (make, compile):
@@ -42,6 +43,16 @@ Video (make, render):
 API keys are read from the environment or a .env file.`;
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const examplesDir = join(repoRoot, "examples");
+
+function bundledExamples(): string[] {
+  try {
+    return exampleNames(readdirSync(examplesDir));
+  } catch {
+    return [];
+  }
+}
+
 for (const file of [resolve(".env"), join(repoRoot, ".env")]) {
   if (existsSync(file)) {
     process.loadEnvFile(file);
@@ -102,7 +113,8 @@ async function loadScript(path: string): Promise<Script> {
 }
 
 async function compileStep(avatar: Avatar, scorePath: string): Promise<Score> {
-  const scriptPath = need("script");
+  const scriptArg = need("script");
+  const scriptPath = scriptSource(scriptArg, examplesDir, bundledExamples());
   const script = await loadScript(scriptPath);
   const lang = args.lang ?? script.meta.lang ?? detectLang(script.plain);
   const tts = textToSpeech(avatar, join(dirname(scorePath), ".tts-cache"));
@@ -110,7 +122,7 @@ async function compileStep(avatar: Avatar, scorePath: string): Promise<Score> {
   const { score, audio } = await compile(script, tts, {
     lang,
     subtitles: args.subtitles,
-    scriptName: relative(dirname(scorePath), scriptPath),
+    scriptName: scriptArg.startsWith(EXAMPLE_PREFIX) ? scriptArg : relative(dirname(scorePath), scriptPath),
     baseDir: dirname(resolve(scriptPath)),
     audioName: basename(audioPath),
     onSegment: (i, n, text) => console.log(`speech ${i + 1}/${n}: ${text.length > 40 ? text.slice(0, 40) + "…" : text}`),
@@ -158,7 +170,8 @@ async function renderStep(avatar: Avatar, score: Score, scorePath: string, out: 
 async function main() {
   const command = positionals[0];
   if (args.help || !command) {
-    console.log(USAGE);
+    const examples = bundledExamples();
+    console.log(examples.length ? `${USAGE}\n\nBundled scripts: ${examples.map((n) => EXAMPLE_PREFIX + n).join(", ")}` : USAGE);
     return;
   }
   const avatar = await loadAvatar(need("avatar"));

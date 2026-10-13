@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Package smoke test: pack the exact tarball (prepack builds dist/ and bundles the engine),
 # install it into an empty folder with no mesh-avatar package and no esbuild beside it,
-# and make a video through both the CLI and the library with the offline mock voice.
+# and make a video through both the CLI and the library with the offline mock voice, and compile
+# a bundled example script (--script example:<name>).
 # Then check the video is real: an H.264 + AAC MP4 of the expected length whose frames show
 # the avatar, not a blank canvas.
 #
@@ -27,6 +28,11 @@ fi
 printf '[emotion:happy] こんにちは！<nod> Hello from the package.\n' > story.avs
 node_modules/.bin/avatarscript make --avatar "$AVATAR" --script story.avs --tts mock \
   --size 640x360 -o out/cli.mp4
+# compile only: enough to show the bundled script shipped and resolves from the installed package
+node_modules/.bin/avatarscript compile --avatar "$AVATAR" --script example:hello-en --tts mock \
+  -o out/example.score.json
+grep -q '"script": "example:hello-en"' out/example.score.json \
+  || { echo "bundled example: provenance missing from out/example.score.json"; exit 1; }
 
 cat > lib.mjs <<EOF
 import { loadAvatar, parseScript, compile, render, createTts, toWav } from 'avatarscript';
