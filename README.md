@@ -32,9 +32,22 @@ echo "ELEVENLABS_API_KEY=..." > .env    # read from the environment or ./.env
 ## Command line
 
 ```sh
-npx avatarscript make --avatar avatars/ani \
-  --script examples/hello-ja.avs --tts elevenlabs -o out/hello-ja.mp4
+npx avatarscript make --avatar https://raw.githubusercontent.com/receptron/mulmocast-media/main/avatars/ani \
+  --script example:hello-ja --tts elevenlabs -o out/hello-ja.mp4
 ```
+
+`--script example:<name>` reads a sample script shipped with the package
+([`examples/*.avs`](examples): `hello-ja`, `hello-en`, `subtitles-ja`); `--script` otherwise takes
+your own `.avs` or plain `.txt` file.
+
+> **`npx avatarscript` does not work inside a clone of this repository.** npx finds the project
+> itself instead of the published package, and a package is never linked into its own
+> `node_modules/.bin`, so it fails with `sh: avatarscript: command not found`, even after
+> `npm run build`. Run it from any other folder, or in the clone use one of:
+>
+> - `npm run avatarscript -- make ...`: the CLI from source
+> - `node dist/cli.js make ...`: the built CLI, after `npm run build`
+> - `npx avatarscript@latest make ...`: the published package, fetched from npm
 
 This writes `out/hello-ja.wav`, `out/hello-ja.score.json` and `out/hello-ja.mp4`. Synthesized
 speech is cached per segment in `out/.tts-cache/`, so changing motions or one sentence does not
@@ -44,14 +57,9 @@ voice. The steps can also be run separately with `compile` and `render`; run
 
 `--avatar` takes a mesh-avatar-studio project folder (`rig.json` + `built/`) or a folder with an
 `avatar.json` manifest, on disk or at an http(s) URL. The repository includes one sample avatar,
-[`avatars/ani`](avatars/ani) (not in the npm package). It is also published in
+[`avatars/ani`](avatars/ani) (not in the npm package); the URL above is the same avatar, published in
 [mulmocast-media](https://github.com/receptron/mulmocast-media/tree/main/avatars), so it works
-without a clone:
-
-```sh
-npx avatarscript make --avatar https://raw.githubusercontent.com/receptron/mulmocast-media/main/avatars/ani \
-  --script hello.avs --tts elevenlabs -o out/hello.mp4
-```
+without a clone.
 
 From a URL, the package's small JSON files are fetched each time and its images are cached in
 `~/.cache/avatarscript/avatars/` (or `$AVATARSCRIPT_AVATAR_DIR`), per build of the avatar, so an

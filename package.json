@@ -34,7 +34,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "examples/*.avs"
   ],
   "engines": {
     "node": ">=22.18"
