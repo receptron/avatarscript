@@ -43,28 +43,28 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: npm
+          cache: yarn
 
       # PUPPETEER_SKIP_DOWNLOAD: nothing here starts a browser, and Chrome is most of the install.
-      - run: npm ci
+      - run: yarn install --frozen-lockfile
         env:
           PUPPETEER_SKIP_DOWNLOAD: "true"
 
       # Prettier first: a formatting slip is the cheapest failure to read.
       - name: Format
-        run: npm run format:check
+        run: yarn format:check
 
       # Includes the type-aware rules (no floating promises, no `any` arriving from outside).
       - name: Lint
-        run: npm run lint
+        run: yarn lint
 
       # Covers src, tests and scripts (tsconfig.json includes all three). Needed on its own
       # because vitest strips types rather than checking them.
       - name: Typecheck
-        run: npm run typecheck
+        run: yarn typecheck
 
       - name: Build
-        run: npm run build
+        run: yarn build
 
       # The build must have bundled the version package.json pins, not whatever was installed.
       - name: Check the bundled engine
@@ -97,14 +97,14 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
+          cache: yarn
 
-      - run: npm ci
+      - run: yarn install --frozen-lockfile
         env:
           PUPPETEER_SKIP_DOWNLOAD: "true"
 
       - name: Test
-        run: npm test
+        run: yarn test
 
   # Verifies the published package actually works: scripts/smoke.sh packs the exact tarball
   # (prepack builds dist/ and bundles the engine), installs it into an empty folder with no
@@ -123,7 +123,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: npm
+          cache: yarn
 
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
@@ -136,7 +136,7 @@ jobs:
 
       # This install keeps Puppeteer's Chrome download: the package installed by the smoke
       # resolves the same Chrome from the shared cache.
-      - run: npm ci
+      - run: yarn install --frozen-lockfile
 
       - name: Pack, install, render
         run: scripts/smoke.sh avatars/ani

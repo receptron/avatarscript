@@ -6,7 +6,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-/** Where `npm run build` writes the bundled engine (dist/engine/ next to dist/engine.js). */
+/** Where `yarn build` writes the bundled engine (dist/engine/ next to dist/engine.js). */
 export const BUNDLED_ENGINE = resolve(here, "engine/mesh-engine.js");
 /**
  * The engine in a mesh-avatar-studio checkout: the runtime package, or the src/engine/ it lived in

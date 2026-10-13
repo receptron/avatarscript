@@ -1,6 +1,6 @@
 // Make a lip-synced video with the library API.
 //
-//   npm run build                                          # once: the package entry is dist/
+//   yarn build                                             # once: the package entry is dist/
 //   node --env-file-if-exists=.env examples/make-video.ts  # needs ELEVENLABS_API_KEY and ffmpeg
 //
 // Writes out/hello.wav, out/hello.score.json and out/hello.mp4. The speech provider is a parameter:

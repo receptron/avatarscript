@@ -43,10 +43,10 @@ your own `.avs` or plain `.txt` file.
 > **`npx avatarscript` does not work inside a clone of this repository.** npx finds the project
 > itself instead of the published package, and a package is never linked into its own
 > `node_modules/.bin`, so it fails with `sh: avatarscript: command not found`, even after
-> `npm run build`. Run it from any other folder, or in the clone use one of:
+> `yarn build`. Run it from any other folder, or in the clone use one of:
 >
-> - `npm run avatarscript -- make ...`: the CLI from source
-> - `node dist/cli.js make ...`: the built CLI, after `npm run build`
+> - `yarn avatarscript make ...`: the CLI from source
+> - `node dist/cli.js make ...`: the built CLI, after `yarn build`
 > - `npx avatarscript@latest make ...`: the published package, fetched from npm
 
 This writes `out/hello-ja.wav`, `out/hello-ja.score.json` and `out/hello-ja.mp4`. Synthesized
@@ -253,19 +253,19 @@ exact version in package.json. To try engine changes before they are published, 
 [mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio) checkout.
 
 ```sh
-npm install
-npm run format     # Prettier
-npm run lint       # ESLint, including type-aware rules
-npm test
-npm run typecheck
-npm run build      # dist/, including the engine bundled from mesh-avatar
+yarn install
+yarn format   # Prettier
+yarn lint     # ESLint, including type-aware rules
+yarn test
+yarn typecheck
+yarn build    # dist/, including the engine bundled from mesh-avatar
 scripts/smoke.sh avatars/ani   # pack, install, render (as CI does)
 ```
 
 CI (`.github/workflows/ci.yml`) runs Prettier, ESLint, the typecheck and build, the tests on Ubuntu and macOS,
 and the package smoke above.
 
-`npm run build` records the engine's package version in `dist/engine/source.json`.
+`yarn build` records the engine's package version in `dist/engine/source.json`.
 
 ## License
 
