@@ -1,4 +1,4 @@
-// npm run build: compiles src/ to dist/ and bundles the mesh avatar engine (the mesh-avatar
+// yarn build: compiles src/ to dist/ and bundles the mesh avatar engine (the mesh-avatar
 // package) into dist/engine/ with its license, so the package runs without it or esbuild.
 import { execFileSync } from "node:child_process";
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
