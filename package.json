@@ -52,8 +52,8 @@
   },
   "dependencies": {
     "kuromoji": "^0.1.2",
-    "puppeteer": "^25.12.0",
-    "zod": "^4.6.5"
+    "puppeteer": "^25.16.0",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "onnxruntime-node": "^1.30.0"
@@ -66,20 +66,20 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/kuromoji": "^0.1.3",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "esbuild": "^0.28.2",
-    "eslint": "^10.12.0",
+    "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.6",
+    "eslint-plugin-prettier": "^5.5.7",
     "eslint-plugin-security": "^4.2.0",
     "eslint-plugin-sonarjs": "^4.2.2",
     "globals": "^17.13.0",
     "mesh-avatar": "0.1.1",
-    "onnxruntime-node": "^1.30.0",
-    "prettier": "^3.9.9",
+    "onnxruntime-node": "^1.31.1",
+    "prettier": "^3.9.10",
     "typescript": "~6.0.2",
-    "typescript-eslint": "^8.71.1",
-    "vite": "^8.3.2",
-    "vitest": "^5.0.3"
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   }
 }
