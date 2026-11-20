@@ -48,7 +48,9 @@ Measured with the sample avatar on a 10.6 s song sung by NEUTRINO: rendered in 6
 looked at in a browser. Not judged: whether it looks like singing (the user's to watch). Known:
 a video is embedded in the tool's result as a data URI, 1.96 MB for 10.6 s at 854×480 (H.264 at
 CRF 18), so a long song is heavy for a chat; the tool call waits for the render; not yet tried
-from MulmoChat.
+from MulmoChat. Codex review: a note too short to show its consonant shows the vowel only (a
+vowel put after the note's end stayed open through the rest), and videos that finish together
+under one name are kept as two files.
 
 Findings that changed the plan:
 

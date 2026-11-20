@@ -24,12 +24,26 @@ export interface ManageContext extends ToolContext {
 /** Where videos are kept through the host's files. */
 const VIDEO_DIR = "avatarscript";
 
-/** Never overwrites: a name that is taken answers undefined, and the tool tries another. */
+/** Paths being written by a call that has not finished: the host's files do not show them yet. */
+const writing = new Set<string>();
+
+/**
+ * Never overwrites: a name that is taken answers undefined, and the tool tries another. Taken
+ * also means being written right now by another call, so two videos that finish together under
+ * one name are kept as two files.
+ */
 async function saveVideo(files: FileOps, name: string, content: Uint8Array): Promise<string | undefined> {
   const path = `${VIDEO_DIR}/${name}`;
-  if (await files.exists(path)) return undefined;
-  await files.write(path, content);
-  return path;
+  if (writing.has(path)) return undefined;
+  // Held before the first await, so the check and the write are one step among this server's calls.
+  writing.add(path);
+  try {
+    if (await files.exists(path)) return undefined;
+    await files.write(path, content);
+    return path;
+  } finally {
+    writing.delete(path);
+  }
 }
 
 /** What the LLM is told the user now sees. */

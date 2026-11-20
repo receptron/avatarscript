@@ -81,24 +81,28 @@ const MIN_GAP = 0.034;
 
 const ms = (t: number) => Math.round(t * 1000) / 1000;
 
-/** The mouth of one mora sung from `s`: its consonant before `s`, never before `earliest`. */
-function sungMora(mora: Mora, s: number, earliest: number): VisemeEvent[] {
+/** The mouth of one mora sung from `s` to `e`: its consonant before `s`, never before `earliest`; nothing after `e`. */
+function sungMora(mora: Mora, s: number, e: number, earliest: number): VisemeEvent[] {
   if (mora.kind === "q") return [[s, "sil"]];
   if (mora.kind === "n") return [[s, "nn"]];
   const vowel = VOWEL_VISEME[mora.vowel];
   if (!mora.onset) return [[s, vowel]];
   const lead = mora.onset === "PP" ? LIPS : CONSONANT;
   const at = Math.max(s - lead, earliest);
-  // No room before the note: the consonant takes the note's first moment instead.
-  return at < s
+  if (at < s)
+    return [
+      [at, mora.onset],
+      [s, vowel],
+    ];
+  // No room before the note: the consonant takes the note's first moment instead, when the note
+  // is long enough to show the vowel after it; a shorter note shows its vowel only (a vowel put
+  // after the note's end would stay open through the rest that follows).
+  return s + MIN_GAP < e
     ? [
-        [at, mora.onset],
-        [s, vowel],
-      ]
-    : [
         [s, mora.onset],
         [s + MIN_GAP, vowel],
-      ];
+      ]
+    : [[s, vowel]];
 }
 
 /** The mouth of one syllable: kana by the rules of singing, other text as speech spread over the note. */
@@ -117,7 +121,7 @@ async function syllableVisemes(syllable: Syllable, earliest: number): Promise<Vi
   }
   const moras = kanaMoras(chars);
   const step = (syllable.end - syllable.t) / Math.max(1, moras.length);
-  return moras.flatMap((mora, i) => sungMora(mora, syllable.t + i * step, i === 0 ? earliest : syllable.t + (i - 0.5) * step));
+  return moras.flatMap((mora, i) => sungMora(mora, syllable.t + i * step, syllable.t + (i + 1) * step, i === 0 ? earliest : syllable.t + (i - 0.5) * step));
 }
 
 /** The lyric lines that are sung: one track's, in order. */

@@ -85,6 +85,17 @@ describe("the GUI Chat Protocol plugin", () => {
     expect(again.data?.file).toBe("avatarscript/song-2.mp4");
   });
 
+  it("keeps two videos that finish together under one name as two files", async () => {
+    const { byPath, stored } = hostFiles(song);
+    const results = await Promise.all([1, 2, 3].map(() => executeManage({ files: { byPath } }, sing, offline)));
+    expect(results.map((result) => result.data?.file).sort()).toEqual(["avatarscript/song-2.mp4", "avatarscript/song-3.mp4", "avatarscript/song.mp4"]);
+    expect([...stored.keys()].filter((path) => path.startsWith("avatarscript/")).sort()).toEqual([
+      "avatarscript/song-2.mp4",
+      "avatarscript/song-3.mp4",
+      "avatarscript/song.mp4",
+    ]);
+  });
+
   it("uses the host's avatar when the call names none", async () => {
     const { byPath } = hostFiles(song);
     const loaded: string[] = [];

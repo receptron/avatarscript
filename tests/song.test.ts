@@ -134,6 +134,27 @@ describe("compileSong", () => {
       [1.054, "aa"],
       [2, "sil"],
     ]);
+    // too short even for that: the vowel alone, and the mouth closes for the rest after it
+    const brief = await compileSong(
+      song([
+        {
+          syllables: [
+            ["あ", 1, 1.02],
+            ["か", 1.02, 1.04],
+          ],
+        },
+      ]),
+      { audioDelay: 0 },
+    );
+    expect(brief.visemes).toEqual([
+      [1, "aa"],
+      [1.04, "sil"],
+    ]);
+    const alone = await compileSong(song([{ syllables: [["か", 0, 0.02]] }]), { audioDelay: 0 });
+    expect(alone.visemes).toEqual([
+      [0, "aa"],
+      [0.02, "sil"],
+    ]);
   });
 
   it("moves every time by the audio's delay: 23 ms for JingleScript's MP3, none for its WAV", async () => {
