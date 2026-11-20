@@ -2,16 +2,24 @@
 // The GUI Chat Protocol plugin (gui-plugin/) wraps it: a ToolResult whose `data` a video view
 // plays. A carrier says what files the model's paths may reach and where the video is kept; the
 // tool itself only reads through the carrier and writes to a temporary folder it removes.
+//
+// A carrier whose view can show the avatar itself (`live`) gets a performance instead of a video:
+// the score, the audio and the voice levels, which the view plays with the mesh engine in the
+// browser, at once and with nothing rendered. The view asks for the avatar (avatarForView) and,
+// when the user wants a file, for the video (renderPerformance).
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { toWav } from "./audio.ts";
+import { readAudio } from "./audio-file.ts";
+import { frameLevels, toWav, type Pcm } from "./audio.ts";
 import { loadAvatar, type Avatar } from "./avatar.ts";
 import { compile, detectLang } from "./compile.ts";
 import { parseJson } from "./json.ts";
+import { LEVEL_FPS } from "./perform.ts";
 import { render, type RenderOptions } from "./render.ts";
-import type { Score } from "./score.ts";
+import { ScoreSchema, type Score } from "./score.ts";
 import { EMOTIONS, parseScript } from "./script.ts";
 import { compileSong, parseSongTiming } from "./song.ts";
 import type { Caption } from "./subtitles.ts";
@@ -26,7 +34,7 @@ export type ToolAction = (typeof TOOL_ACTIONS)[number];
 export const DEFAULT_AVATAR = "https://raw.githubusercontent.com/receptron/mulmocast-media/main/avatars/ani";
 
 export const TOOL_DESCRIPTION =
-  "Make a video of an avatar that sings or speaks, with its mouth following the words. sing: the avatar sings a song made with JingleScript; render the song first (manageJingleScript, renderScore, with a `lyric` on the sung notes), then pass the `audioFile` and `timingFile` it answered. speak: the avatar says a script, text with directions such as [emotion:happy] and <nod>; action getGuide gives the syntax. The video takes about as long to make as it lasts.";
+  "Show an avatar that sings or speaks, with its mouth following the words. sing: the avatar sings a song made with JingleScript; render the song first (manageJingleScript, renderScore, with a `lyric` on the sung notes), then pass the `audioFile` and `timingFile` it answered. speak: the avatar says a script, text with directions such as [emotion:happy] and <nod>; action getGuide gives the syntax. The answer says how it is shown: the avatar performing in a player, or a video of it.";
 
 /** The providers a call may name; `mock` (an offline buzz, for tests) is chosen only by AVATARSCRIPT_TTS. */
 const SPEECH_PROVIDERS = ["elevenlabs", "openai", "gemini"] as const satisfies readonly TtsProvider[];
@@ -84,12 +92,59 @@ export interface VideoData {
   file?: string;
 }
 
+const AUDIO_DATA = /^data:(audio\/(?:mpeg|wav|ogg|mp4|flac));base64,/;
+/** The longest performance a view may ask a video of, seconds. */
+const MAX_DURATION = 3600;
+/** A front matter value, or a score's, that names a file (an image behind the avatar, a font file for the subtitles). */
+const FILE_VALUE = /\.(png|jpe?g|webp|ttf|otf|woff2?)$/i;
+
+/**
+ * What a view needs to make the avatar perform live, and what it sends back to have the video
+ * made (so it is checked there as untyped data).
+ */
+export const PerformanceSchema = z
+  .object({
+    kind: z.enum(["song", "speech"]),
+    title: z.string().max(200),
+    /** seconds; the score's own duration, which is what a video is rendered to */
+    duration: z.number().positive().max(MAX_DURATION),
+    width: z.int().min(16).max(4096),
+    height: z.int().min(16).max(4096),
+    /** the song or the speech, as a data URI the view plays */
+    audio: z.string().regex(AUDIO_DATA),
+    /** the voice level of each frame at LEVEL_FPS, 0–1: it moves the head with the voice */
+    levels: z.array(z.number()).max(MAX_DURATION * LEVEL_FPS + 1),
+    /** the mouth shapes, speaking spans, cues, captions, background and placement */
+    score: ScoreSchema,
+    /** draw the captions over the avatar */
+    subtitles: z.boolean(),
+    /** the avatar the call named, an https URL; absent: the carrier's own */
+    avatar: z.url({ protocol: /^https$/ }).optional(),
+    /** which avatar that is, for a view to tell one from another without learning where the carrier's own is from */
+    avatarKey: z.string().max(64).optional(),
+  })
+  // A video is rendered to the score's duration: the limit above must be on that one.
+  .refine((performance) => performance.score.duration === performance.duration, { path: ["score", "duration"], message: "must be the performance's duration" });
+export type PerformanceData = z.infer<typeof PerformanceSchema>;
+
+/** The avatar a view may name: an https URL, or none. */
+const AvatarUrlSchema = z.url({ protocol: /^https$/ }).optional();
+
+/** An avatar as the mesh engine takes it in a page. */
+export interface AvatarAssets {
+  rig: unknown;
+  /** asset name → data URL */
+  assets: Record<string, string>;
+}
+
 export interface ToolResult {
   /** What the model reads: a JSON summary, a guide, or an error it can act on. */
   text: string;
   isError: boolean;
   /** For a view: present after a video was made. */
   video?: VideoData;
+  /** For a view that shows the avatar itself (a `live` carrier): present instead of `video`. */
+  performance?: PerformanceData;
 }
 
 export interface ToolCarrier {
@@ -102,6 +157,12 @@ export interface ToolCarrier {
   saveFile?: (name: string, content: Uint8Array) => Promise<string | undefined>;
   /** The avatar when the call names none: a folder or an https URL (default DEFAULT_AVATAR). */
   avatar?: string;
+  /**
+   * The carrier's view shows the avatar itself and can call back (avatarForView,
+   * renderPerformance): sing and speak then answer at once with a performance, and no video is
+   * rendered until the view asks for one.
+   */
+  live?: boolean;
   /** Video size (default 854×480). */
   width?: number;
   height?: number;
@@ -116,7 +177,15 @@ const DEFAULT_WIDTH = 854;
 const DEFAULT_HEIGHT = 480;
 /** Most names tried for one video ("song", "song-2" … "song-1000") before giving up. */
 const MAX_NAMES = 1000;
-const AUDIO_EXTENSIONS = [".mp3", ".wav", ".ogg", ".m4a", ".flac"];
+/** The audio a song may be, by file extension, and how a view is told its kind. */
+const AUDIO_TYPES: readonly [extension: string, mimeType: string][] = [
+  [".mp3", "audio/mpeg"],
+  [".wav", "audio/wav"],
+  [".ogg", "audio/ogg"],
+  [".m4a", "audio/mp4"],
+  [".flac", "audio/flac"],
+];
+const AUDIO_EXTENSIONS = AUDIO_TYPES.map(([extension]) => extension);
 
 const json = (value: unknown): string => JSON.stringify(value, null, 2);
 const fail = (text: string): ToolResult => ({ text, isError: true });
@@ -138,27 +207,70 @@ async function keep(carrier: ToolCarrier, stem: string, video: Uint8Array): Prom
   throw new Error(`No free file name for the video: "${stem}" to "${stem}-${MAX_NAMES}" are all taken. Give another \`fileName\`.`);
 }
 
-/** A video about to be rendered: its score, the audio it plays, and the temporary folder they are in. */
+/** What sing or speak made: a score, the audio it plays, and the temporary folder they are in. */
 interface Job {
   kind: VideoData["kind"];
   stem: string;
   score: Score;
   audioPath: string;
   dir: string;
-  avatar: Avatar;
+  /** the audio as a view plays it, and its samples when they are at hand (speech) */
+  audio: { bytes: Uint8Array; mimeType: string; pcm?: Pcm };
 }
 
-async function makeVideo(job: Job, input: ToolInput, carrier: ToolCarrier): Promise<ToolResult> {
-  const width = carrier.width ?? DEFAULT_WIDTH;
-  const height = carrier.height ?? DEFAULT_HEIGHT;
+const round3 = (x: number): number => Math.round(x * 1000) / 1000;
+
+/** A performance for a view that shows the avatar itself: nothing is rendered. */
+async function perform(job: Job, input: ToolInput, carrier: ToolCarrier): Promise<ToolResult> {
+  const pcm = job.audio.pcm ?? (await readAudio(job.audioPath));
+  const levels = frameLevels(pcm, LEVEL_FPS, Math.ceil(job.score.duration * LEVEL_FPS));
+  const performance: PerformanceData = {
+    kind: job.kind,
+    title: input.fileName ?? job.stem,
+    duration: job.score.duration,
+    width: carrier.width ?? DEFAULT_WIDTH,
+    height: carrier.height ?? DEFAULT_HEIGHT,
+    audio: `data:${job.audio.mimeType};base64,${Buffer.from(job.audio.bytes).toString("base64")}`,
+    levels: Array.from(levels, round3),
+    score: job.score,
+    // As the renderer resolves it: what the call says, else whether the script turns them on.
+    subtitles: input.subtitles ?? job.score.subtitles !== null,
+    ...(input.avatar === undefined ? {} : { avatar: input.avatar }),
+    avatarKey: avatarKey(input.avatar, carrier),
+  };
+  const summary = {
+    ok: true,
+    duration: job.score.duration,
+    [job.kind === "song" ? "lyricLines" : "sentences"]: job.score.captions.length,
+    shown: "the avatar performs it in the player; a video file is made only when the user downloads one there",
+  };
+  return { text: json(summary), isError: false, performance };
+}
+
+/** What a video is rendered from: a job's, or a performance a view sent back. */
+interface VideoJob {
+  kind: VideoData["kind"];
+  stem: string;
+  title: string;
+  score: Score;
+  audioPath: string;
+  dir: string;
+  avatar: Avatar;
+  width: number;
+  height: number;
+  subtitles: boolean | undefined;
+}
+
+async function makeVideo(job: VideoJob, carrier: ToolCarrier): Promise<ToolResult> {
+  const { width, height } = job;
   const out = join(job.dir, "video.mp4");
   const started = Date.now();
-  await (carrier.render ?? render)({ avatar: job.avatar, score: job.score, audioPath: job.audioPath, out, width, height, subtitles: input.subtitles });
+  await (carrier.render ?? render)({ avatar: job.avatar, score: job.score, audioPath: job.audioPath, out, width, height, subtitles: job.subtitles });
   const bytes = await readFile(out);
   const file = await keep(carrier, job.stem, bytes);
   const video: VideoData = {
     kind: job.kind,
-    title: input.fileName ?? job.stem,
+    title: job.title,
     video: `data:video/mp4;base64,${bytes.toString("base64")}`,
     mimeType: "video/mp4",
     duration: job.score.duration,
@@ -178,8 +290,36 @@ async function makeVideo(job: Job, input: ToolInput, carrier: ToolCarrier): Prom
   return { text: json(summary), isError: false, video };
 }
 
-const avatarOf = (input: ToolInput, carrier: ToolCarrier): Promise<Avatar> =>
-  (carrier.loadAvatar ?? loadAvatar)(input.avatar ?? carrier.avatar ?? DEFAULT_AVATAR);
+/** The avatar a call or a view named (an https URL), else the carrier's, else the sample avatar. */
+const avatarAt = (named: string | undefined, carrier: ToolCarrier): Promise<Avatar> =>
+  (carrier.loadAvatar ?? loadAvatar)(named ?? carrier.avatar ?? DEFAULT_AVATAR);
+
+/** Which avatar that is, as a view may know it: a digest, since the carrier's own may be a folder on its computer. */
+const avatarKey = (named: string | undefined, carrier: ToolCarrier): string =>
+  createHash("sha256")
+    .update(named ?? carrier.avatar ?? DEFAULT_AVATAR)
+    .digest("hex")
+    .slice(0, 16);
+
+/** A job as a live performance (a `live` carrier), or as a video. */
+async function present(job: Job, input: ToolInput, carrier: ToolCarrier, avatar?: Avatar): Promise<ToolResult> {
+  if (carrier.live === true) return perform(job, input, carrier);
+  return makeVideo(
+    {
+      kind: job.kind,
+      stem: job.stem,
+      title: input.fileName ?? job.stem,
+      score: job.score,
+      audioPath: job.audioPath,
+      dir: job.dir,
+      avatar: avatar ?? (await avatarAt(input.avatar, carrier)),
+      width: carrier.width ?? DEFAULT_WIDTH,
+      height: carrier.height ?? DEFAULT_HEIGHT,
+      subtitles: input.subtitles,
+    },
+    carrier,
+  );
+}
 
 async function sing(input: ToolInput, carrier: ToolCarrier, dir: string): Promise<ToolResult> {
   const { audioFile, timingFile } = input;
@@ -196,14 +336,15 @@ async function sing(input: ToolInput, carrier: ToolCarrier, dir: string): Promis
   // The extension is kept: an MP3 from JingleScript plays 23 ms late, and the song's times allow for it.
   const audioName = `song${extension}`;
   const audioPath = join(dir, audioName);
-  await writeFile(audioPath, await carrier.readFile(audioFile));
+  const bytes = await carrier.readFile(audioFile);
+  await writeFile(audioPath, bytes);
   const score = await compileSong(timing, { audioName, emotion: input.emotion });
-  return makeVideo({ kind: "song", stem: input.fileName ?? "song", score, audioPath, dir, avatar: await avatarOf(input, carrier) }, input, carrier);
+  const mimeType = AUDIO_TYPES.find(([ext]) => ext === extension)?.[1] ?? "audio/mpeg";
+  return present({ kind: "song", stem: input.fileName ?? "song", score, audioPath, dir, audio: { bytes, mimeType } }, input, carrier);
 }
 
 /** Front matter that may name a file (an image behind the avatar, a font file for the subtitles). */
 const FILE_KEYS = ["background", "subtitle-font"] as const;
-const FILE_VALUE = /\.(png|jpe?g|webp|ttf|otf|woff2?)$/i;
 
 /** The provider speak uses: the call's, then AVATARSCRIPT_TTS, then the first whose key is set. */
 function speechProvider(input: ToolInput): TtsProvider {
@@ -240,7 +381,7 @@ async function speak(input: ToolInput, carrier: ToolCarrier, dir: string): Promi
   // A script from a model names no files on this computer: a background image or a font file would be read from it.
   const fileKey = FILE_KEYS.find((key) => FILE_VALUE.test(script.meta[key] ?? ""));
   if (fileKey !== undefined) return fail(`\`${fileKey}\` cannot be a file here: give a CSS colour for the background, or a font family for the subtitles.`);
-  const avatar = await avatarOf(input, carrier);
+  const avatar = await avatarAt(input.avatar, carrier);
   const audioName = "speech.wav";
   const { score, audio } = await compile(script, speech(input, carrier, avatar), {
     lang: script.meta.lang ?? detectLang(script.plain),
@@ -248,8 +389,10 @@ async function speak(input: ToolInput, carrier: ToolCarrier, dir: string): Promi
     audioName,
   });
   const audioPath = join(dir, audioName);
-  await writeFile(audioPath, toWav(audio));
-  return makeVideo({ kind: "speech", stem: input.fileName ?? "speech", score, audioPath, dir, avatar }, input, carrier);
+  const bytes = toWav(audio);
+  await writeFile(audioPath, bytes);
+  const job: Job = { kind: "speech", stem: input.fileName ?? "speech", score, audioPath, dir, audio: { bytes, mimeType: "audio/wav", pcm: audio } };
+  return present(job, input, carrier, avatar);
 }
 
 const ACTIONS: Record<Exclude<ToolAction, "getGuide">, (input: ToolInput, carrier: ToolCarrier, dir: string) => Promise<ToolResult>> = { sing, speak };
@@ -263,6 +406,59 @@ export async function manage(input: ToolInput, carrier: ToolCarrier = {}): Promi
   const dir = await mkdtemp(join(tmpdir(), "avatarscript-"));
   try {
     return await ACTIONS[input.action](input, carrier, dir);
+  } catch (error) {
+    return fail(error instanceof Error ? error.message : String(error));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/** A view's avatar: the one a performance names (an https URL), else the carrier's. As data, so a page can hand it to the mesh engine. */
+export async function avatarForView(named: unknown, carrier: ToolCarrier = {}): Promise<AvatarAssets> {
+  const url = AvatarUrlSchema.safeParse(named);
+  if (!url.success) throw new Error("the avatar a view names must be an https URL");
+  const avatar = await avatarAt(url.data, carrier);
+  return { rig: avatar.rig, assets: avatar.assets };
+}
+
+/** A file stem from a performance's title, which a view sent back: only what a stem may hold. */
+function stemOf(title: string): string {
+  const stem = title.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[.-]+/, "");
+  return FILE_STEM.test(stem) ? stem : "avatar";
+}
+
+/**
+ * The video of a performance, when the user wants a file: rendered now, kept by the carrier and
+ * returned as `video`. The performance comes back from a view, so it is checked, and it may name
+ * no file on this computer (a background image, a font).
+ */
+export async function renderPerformance(sent: unknown, carrier: ToolCarrier = {}): Promise<ToolResult> {
+  const parsed = PerformanceSchema.safeParse(sent);
+  if (!parsed.success) return fail(`That is not a performance this tool made:\n${z.prettifyError(parsed.error)}`);
+  const performance = parsed.data;
+  if (FILE_VALUE.test(performance.score.view.background) || FILE_VALUE.test(performance.score.subtitles?.font ?? ""))
+    return fail("A performance may not name a file for its background or its subtitle font.");
+  const type = AUDIO_DATA.exec(performance.audio)?.[1];
+  const extension = AUDIO_TYPES.find(([, mimeType]) => mimeType === type)?.[0];
+  if (extension === undefined) return fail("The performance's audio is of a kind this tool does not make.");
+  const dir = await mkdtemp(join(tmpdir(), "avatarscript-"));
+  try {
+    // The name keeps the extension; the score's times already allow for an MP3's delay.
+    const audioPath = join(dir, `audio${extension}`);
+    await writeFile(audioPath, Buffer.from(performance.audio.slice(performance.audio.indexOf(",") + 1), "base64"));
+    const job: VideoJob = {
+      kind: performance.kind,
+      stem: stemOf(performance.title),
+      title: performance.title,
+      score: performance.score,
+      audioPath,
+      dir,
+      avatar: await avatarAt(performance.avatar, carrier),
+      width: performance.width,
+      height: performance.height,
+      subtitles: performance.subtitles,
+    };
+    return await makeVideo(job, carrier);
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error));
   } finally {

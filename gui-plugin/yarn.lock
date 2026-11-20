@@ -471,6 +471,11 @@ fdir@^6.5.0:
   resolved "https://registry.yarnpkg.com/fdir/-/fdir-6.5.0.tgz#ed2ab967a331ade62f18d077dae192684d50d350"
   integrity sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==
 
+fflate@^0.8.3:
+  version "0.8.3"
+  resolved "https://registry.yarnpkg.com/fflate/-/fflate-0.8.3.tgz#bc27d8eb30343d4d512abb03480202ce65d825fc"
+  integrity sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==
+
 fsevents@~2.3.3:
   version "2.3.3"
   resolved "https://registry.yarnpkg.com/fsevents/-/fsevents-2.3.3.tgz#cac6407785d03675a2a5e1a5305c697b347d90d6"
@@ -597,6 +602,13 @@ magic-string@^1.4.5:
   integrity sha512-oLLC2+YvQUfAa+vxoufE/yc1icb87M9iXIRqAoR/2EhE/8cb3SF/+Gi0c2By1B+5Vz2e2vQtUvHiu1+63Znh+w==
   dependencies:
     "@jridgewell/sourcemap-codec" "^1.6.0"
+
+mesh-avatar@0.1.1:
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/mesh-avatar/-/mesh-avatar-0.1.1.tgz#2cf8a3500c61fa2df9484ab8d00b9fb2c875bd71"
+  integrity sha512-RVSizpqYjVX6rbGfdSgwS0/bDcADn5tcDDSyctDi9cPeSdb5cCep8Y2AAzj3WRw258PHDsJ8nTmkREyDLZOF/Q==
+  dependencies:
+    fflate "^0.8.3"
 
 mitt@^3.0.1:
   version "3.0.1"

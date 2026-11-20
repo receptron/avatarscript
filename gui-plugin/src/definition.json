@@ -1,7 +1,7 @@
 {
   "type": "function",
   "name": "manageAvatarScript",
-  "description": "Make a video of an avatar that sings or speaks, with its mouth following the words. sing: the avatar sings a song made with JingleScript; render the song first (manageJingleScript, renderScore, with a `lyric` on the sung notes), then pass the `audioFile` and `timingFile` it answered. speak: the avatar says a script, text with directions such as [emotion:happy] and <nod>; action getGuide gives the syntax. The video takes about as long to make as it lasts. The video is shown to the user in a player.",
+  "description": "Show an avatar that sings or speaks, with its mouth following the words. sing: the avatar sings a song made with JingleScript; render the song first (manageJingleScript, renderScore, with a `lyric` on the sung notes), then pass the `audioFile` and `timingFile` it answered. speak: the avatar says a script, text with directions such as [emotion:happy] and <nod>; action getGuide gives the syntax. The answer says how it is shown: the avatar performing in a player, or a video of it.",
   "parameters": {
     "type": "object",
     "properties": {

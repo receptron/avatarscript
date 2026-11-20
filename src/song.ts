@@ -136,6 +136,17 @@ function sungLines(timing: SongTiming, track: number | undefined): NonNullable<S
   return sung.toSorted((a, b) => a.t - b.t);
 }
 
+/** The emotion comes this long before a line is sung, as before a spoken sentence. */
+const EMOTION_LEAD = 0.15;
+
+/**
+ * The song's emotion from the start, and again before each line: the engine lets an emotion go a
+ * moment after the avatar stops singing, so a line after a long rest would be sung without it.
+ */
+function emotionCues(lineTimes: number[], emotion: Emotion): Score["cues"] {
+  return [...new Set([0, ...lineTimes])].toSorted((a, b) => a - b).map((t) => ({ t, emotion }));
+}
+
 /**
  * A score in which the avatar sings a JingleScript song: its mouth follows the lyric syllables of
  * the timing map, each lyric line is a caption, and the avatar "speaks" (moves with the sound)
@@ -164,7 +175,10 @@ export async function compileSong(timing: SongTiming, options: SongOptions = {})
     duration: ms(timing.duration),
     visemes: normalizeEvents(visemes.map(([t, viseme]): VisemeEvent => [shifted(t), viseme])),
     speaking: lines.map((line) => [shifted(line.t - LIPS), shifted(line.end)]),
-    cues: [{ t: 0, emotion: options.emotion ?? "neutral" }],
+    cues: emotionCues(
+      lines.map((line) => shifted(line.t - EMOTION_LEAD)),
+      options.emotion ?? "neutral",
+    ),
     captions,
     subtitles: null,
     view: resolveView(undefined, options.view),

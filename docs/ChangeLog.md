@@ -1,6 +1,19 @@
 # ChangeLog
 
-## 0.6.0 (unreleased)
+## 0.7.0 (unreleased)
+
+- **The avatar performs live**: a carrier whose view can call back (`live`; the plugin's
+  `liveAvatar`) gets a performance instead of a video: the score, the audio and the voice
+  levels. The view draws the avatar itself with the mesh engine, following the audio, so the call
+  answers at once and a card is about a tenth of the size. A video is rendered only when the user
+  downloads one (`renderPerformance`). Other carriers get the video as before.
+- **`avatarscript/player`**: a browser entry (no Node built-in) with `createPerformer`, which makes
+  a mesh avatar perform a score against a clock, and the stage geometry. The renderer plans its
+  frames with the same functions (`momentAt`, `cueActions`).
+- **Plugin**: the card and its preview take their text colour from the host instead of following
+  the system's colour scheme, so they read on a light host under a dark system and the reverse.
+
+## 0.6.0 (2026-11-20)
 
 - **An avatar that sings a JingleScript song**: `compileSong` turns a JingleScript timing map
   (`jinglescript-timing/1`) into a score whose mouth follows the lyric syllables, and

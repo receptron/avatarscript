@@ -52,6 +52,18 @@ from MulmoChat. Codex review: a note too short to show its consonant shows the v
 vowel put after the note's end stayed open through the rest), and videos that finish together
 under one name are kept as two files.
 
+Update (2026-11-20, later): the avatar performs live in the card (0.7.0). The user's point: a chat
+does not need a video, only the avatar moving with the sound. A carrier whose view can call back
+gets a performance (score, audio, voice levels at 30 fps) and the view drives the mesh engine with
+`createPerformer` (src/player.ts, the browser entry `avatarscript/player`) against the audio
+element's time; the renderer plans its frames with the same `momentAt` and `cueActions`
+(src/perform.ts). The avatar is fetched by the view from the tool's server side, once per page;
+the video is rendered only when the user presses Download (`renderPerformance`). Measured on the
+10.6 s song: the card is 205 KB (the MP3) instead of 2.6 MB, the call answers without rendering,
+the avatar reply is 4.2 MB once. Looked at in a headless browser: the mouth is on お at 1.6 s, the
+lyric line is marked, the download answers; on a dark host under a light system and the reverse
+the text reads. Live playback is not seeded (blinks differ between plays); a video still is.
+
 Findings that changed the plan:
 
 - ElevenLabs `alignment` maps one-to-one to the text sent; with `eleven_v3` the emotion tag's

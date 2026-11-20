@@ -4,7 +4,8 @@ import { EMOTIONS } from "./script.ts";
 
 export const TOOL_GUIDE = `# manageAvatarScript
 
-An avatar that sings or speaks, as a video with its mouth following the words.
+An avatar that sings or speaks, with its mouth following the words: performing in the user's
+player, or as a video of it, as the answer says.
 
 ## Singing a JingleScript song (action "sing")
 
@@ -18,7 +19,7 @@ The mouth follows the lyric syllables in the timing map: the vowel opens on each
 for the note's length, and the mouth closes in the rests. A song without lyrics cannot be sung
 (the answer says so): add \`lyric\`s to the score and render it again.
 Options: \`emotion\` for the whole song (${EMOTIONS.join(", ")}; default neutral), \`subtitles: true\`
-to draw each lyric line while it is sung, \`fileName\` to name the video.
+to draw each lyric line while it is sung, \`fileName\` to name it.
 If renderScore said the audio is "still rendering", the files are written when it is ready: an
 error that a file is not there yet means wait a moment and call sing again.
 
@@ -51,6 +52,7 @@ there is none the answer says so, and singing still works.
 
 ## Both
 
-The answer says where the video was kept (\`video\`) and how long it is; the user sees it in a
-player. Making it takes about as long as it lasts: say so in a few words before calling.
+The answer says how it is shown. With \`shown\`, the avatar itself performs in the user's player
+at once, and they can download a video of it there; with \`video\`, a video was made (that takes
+about as long as it lasts) and kept at that path. Either way it starts when the user presses play.
 `;

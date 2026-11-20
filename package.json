@@ -1,6 +1,6 @@
 {
   "name": "avatarscript",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Turn an avatar and text into a lip-synced, acted video.",
   "keywords": [
     "avatar",
@@ -26,6 +26,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./player": {
+      "types": "./dist/player.d.ts",
+      "default": "./dist/player.js"
     }
   },
   "bin": {

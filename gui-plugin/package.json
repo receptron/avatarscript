@@ -1,7 +1,7 @@
 {
   "name": "@gui-chat-plugin/avatarscript",
-  "version": "0.6.0",
-  "description": "GUI Chat Protocol plugin for AvatarScript: the manageAvatarScript tool (an avatar that sings a JingleScript song or says a script), with a video view.",
+  "version": "0.7.0",
+  "description": "GUI Chat Protocol plugin for AvatarScript: the manageAvatarScript tool (an avatar that sings a JingleScript song or says a script), with a view where the avatar performs live.",
   "keywords": [
     "gui-chat-protocol",
     "avatarscript",
@@ -54,7 +54,7 @@
     "prepack": "yarn build"
   },
   "peerDependencies": {
-    "avatarscript": "^0.6.0",
+    "avatarscript": "^0.7.0",
     "gui-chat-protocol": "^2.3.0",
     "vue": "^3.5.43"
   },
@@ -69,5 +69,8 @@
     "vue": "^3.5.43",
     "vue-tsc": "^3.3.12",
     "zod": "^4.6.5"
+  },
+  "dependencies": {
+    "mesh-avatar": "0.1.1"
   }
 }

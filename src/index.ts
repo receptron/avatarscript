@@ -28,5 +28,18 @@ export { VISEMES } from "./visemes.ts";
 export type { Viseme, VisemeEvent } from "./visemes.ts";
 export { toWav, fromWav } from "./audio.ts";
 export type { Pcm } from "./audio.ts";
-export { manage, ToolInputSchema, toolInputJsonSchema, TOOL_NAME, TOOL_ACTIONS, TOOL_DESCRIPTION, DEFAULT_AVATAR } from "./tool.ts";
-export type { ToolInput, ToolResult, ToolCarrier, ToolAction, VideoData } from "./tool.ts";
+export {
+  manage,
+  avatarForView,
+  renderPerformance,
+  ToolInputSchema,
+  toolInputJsonSchema,
+  PerformanceSchema,
+  TOOL_NAME,
+  TOOL_ACTIONS,
+  TOOL_DESCRIPTION,
+  DEFAULT_AVATAR,
+} from "./tool.ts";
+export type { ToolInput, ToolResult, ToolCarrier, ToolAction, VideoData, PerformanceData, AvatarAssets } from "./tool.ts";
+export { createPerformer, LEVEL_FPS, MOUTH_LEAD } from "./player.ts";
+export type { Performer, PerformerOptions, MeshAvatarApi } from "./player.ts";

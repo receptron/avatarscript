@@ -9,7 +9,7 @@ export function definitionText(): string {
   const definition = {
     type: "function",
     name: TOOL_NAME,
-    description: `${TOOL_DESCRIPTION} The video is shown to the user in a player.`,
+    description: TOOL_DESCRIPTION,
     parameters: { type: "object", properties, required: schema.required ?? ["action"] },
   };
   return `${JSON.stringify(definition, null, 2)}\n`;
