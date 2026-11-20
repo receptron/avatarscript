@@ -23,7 +23,8 @@ const enforced = (config) =>
   config.rules ? { ...config, rules: Object.fromEntries(Object.entries(config.rules).map(([id, entry]) => [id, raise(entry)])) } : config;
 
 export default [
-  { ignores: ["dist/", "node_modules/", "out/"] },
+  // gui-plugin/ is a separate package (Vue + vite) with its own typecheck and tests.
+  { ignores: ["dist/", "node_modules/", "out/", "gui-plugin/"] },
   {
     // A disable comment that no longer suppresses anything names a reason that has stopped being
     // true. At error the comment has to be removed when it goes stale.

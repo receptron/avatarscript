@@ -14,5 +14,5 @@
     // examples import the package by name, as users do; type-check them against the source
     "paths": { "avatarscript": ["./src/index.ts"] }
   },
-  "include": ["src", "tests", "scripts", "examples"]
+  "include": ["src", "tests", "scripts", "examples", "vitest.config.ts"]
 }

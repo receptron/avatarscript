@@ -15,8 +15,10 @@ See [PLAN.md](PLAN.md) for the design and milestones.
 ## Status
 
 Early, but working end to end: speech from ElevenLabs, OpenAI or Gemini, Japanese and English
-lip sync, emotions and motions, rendered to MP4 with the mesh engine. Not yet: the LLM step that
-writes scripts, gaze and emphasis rendering.
+lip sync, emotions and motions, rendered to MP4 with the mesh engine; an avatar that sings a song
+made with [JingleScript](https://github.com/receptron/jinglescript); a tool for LLMs
+(`manageAvatarScript`) and a [GUI Chat Protocol plugin](gui-plugin) that carries it. Not yet: gaze
+and emphasis rendering.
 
 ## Install
 
@@ -115,6 +117,38 @@ crop the flat top edge of their image, which is only hidden when the avatar reac
 frame. (Placed with `avatar-y`/`avatar-scale` inside the frame, the whole image is shown already.)
 Decode the WebM with `-c:v libvpx-vp9` in ffmpeg to keep its alpha.
 
+### A song from JingleScript (`compileSong`)
+
+[JingleScript](https://github.com/receptron/jinglescript) renders a score to audio and writes a
+timing map beside it (`jinglescript-timing/1`): when every note, beat and lyric syllable happens.
+The lyric syllables are all a mouth needs, so the avatar sings the song with no speech synthesis,
+no alignment and no dependency on JingleScript:
+
+```sh
+npx avatarscript sing --avatar <dir|url> --audio song.mp3 --timing song.timing.json -o song.mp4 --subtitles
+```
+
+```js
+import { compileSong, loadAvatar, parseSongTiming, render } from "avatarscript";
+import { readFile } from "node:fs/promises";
+
+const timing = parseSongTiming(JSON.parse(await readFile("song.timing.json", "utf8")), "song.timing.json");
+const score = await compileSong(timing, { audioName: "song.mp3", emotion: "happy" });
+await render({ avatar: await loadAvatar("path/to/avatar"), score, audioPath: "song.mp3", out: "song.mp4", subtitles: true });
+```
+
+- The vowel opens on each note and is held for the note's length; its consonant shapes the mouth
+  just before the note (70 ms; 100 ms for lips that close: ま, ば, ぱ), as it is sung. A rest of
+  0.12 s or more closes the mouth; a shorter gap holds the vowel into the next note.
+- Kana lyrics (one mora per note) follow these rules; other text is spread over its note as speech.
+- Each lyric line is a caption (`subtitles` draws it), and the avatar moves with the sound during
+  the lines only, not through an interlude.
+- Only `format`, `duration` and `lyrics` of the timing map are read; a map without lyrics, or of
+  another format, is refused with what to do. `track` picks the track when several have lyrics.
+- `audioDelay` moves every time by how late the audio plays against the map. The default follows
+  the audio's name: JingleScript's MP3 starts 23 ms late (1105 samples at 48 kHz, its encoder's
+  delay, which the file does not record), its WAV on time.
+
 ### Text-to-speech
 
 There is one API for every provider: `createTts({ provider, model?, voice?, apiKey?, options?, cacheDir? })`.
@@ -166,6 +200,24 @@ so a character's speaking style travels with it:
 ```
 
 The CLI's `--voice` and `--model` override the avatar's; its options are used as they are.
+
+## A tool for LLMs, and a GUI Chat Protocol plugin
+
+`manage(input, carrier)` is one tool, `manageAvatarScript`, with three actions: `sing` (a video of
+the avatar singing a JingleScript song, from the `audioFile` and `timingFile` that JingleScript's
+`renderScore` answers), `speak` (a video of the avatar saying a script) and `getGuide` (how to
+write a script). `ToolInputSchema` (zod) checks its arguments and `toolInputJsonSchema()` gives
+them as JSON Schema. The carrier decides what the model's paths may reach (`readFile`), where
+videos are kept (`saveFile`, which never overwrites) and which avatar is used when a call names
+none (default: the sample avatar's URL). A result has text for the model and, after a video was
+made, `video` (a data URI, its length and its captions) for a view.
+
+[`gui-plugin/`](gui-plugin) is that tool as a [GUI Chat Protocol](https://github.com/receptron/gui-chat-protocol)
+plugin, `@gui-chat-plugin/avatarscript`, with a video view; see its README for adding it to a host.
+
+`speak` uses the provider the call names, else `AVATARSCRIPT_TTS`, else the first of ElevenLabs,
+OpenAI and Gemini whose key is set, and says so when there is none; `sing` needs no key. A script
+from a model may not name files (a background image, a font file).
 
 ## Scripts
 

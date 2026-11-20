@@ -37,6 +37,21 @@ it made errors larger. Gemini models read prompt-embedded style instructions alo
 system instructions, so Gemini gets the text only; speech that does not match the text is detected
 from the alignment and requested again.
 
+Update (2026-11-20): an avatar sings a song made with JingleScript, and the tool for LLMs exists.
+`compileSong` (src/song.ts) reads the lyric syllables of a JingleScript timing map; the vowel
+lands on the note and is held for it, the consonant comes 70 ms before (a consonant must not grow
+with a long note, as it does when speech is spread over time). `avatarscript sing` renders it.
+`manage()` (src/tool.ts, `manageAvatarScript`: sing, speak, getGuide) is the tool, and
+`gui-plugin/` (`@gui-chat-plugin/avatarscript`) carries it to GUI Chat hosts with a video view.
+Measured with the sample avatar on a 10.6 s song sung by NEUTRINO: rendered in 6–8 s; frames at
+0.8, 1.6, 2.3 and 4.8 s show あ, お, い and a closed mouth where the lyrics say so; the view was
+looked at in a browser. Not judged: whether it looks like singing (the user's to watch). Known:
+a video is embedded in the tool's result as a data URI, 1.96 MB for 10.6 s at 854×480 (H.264 at
+CRF 18), so a long song is heavy for a chat; the tool call waits for the render; not yet tried
+from MulmoChat. Codex review: a note too short to show its consonant shows the vowel only (a
+vowel put after the note's end stayed open through the rest), and videos that finish together
+under one name are kept as two files.
+
 Findings that changed the plan:
 
 - ElevenLabs `alignment` maps one-to-one to the text sent; with `eleven_v3` the emotion tag's

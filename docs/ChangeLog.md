@@ -1,5 +1,16 @@
 # ChangeLog
 
+## 0.6.0 (unreleased)
+
+- **An avatar that sings a JingleScript song**: `compileSong` turns a JingleScript timing map
+  (`jinglescript-timing/1`) into a score whose mouth follows the lyric syllables, and
+  `avatarscript sing --audio … --timing …` makes the video. No speech is synthesized or aligned,
+  and JingleScript is not a dependency.
+- **A tool for LLMs**: `manage()` (`manageAvatarScript`: `sing`, `speak`, `getGuide`), with its
+  zod input schema and JSON Schema.
+- **GUI Chat Protocol plugin**: `gui-plugin/`, published as `@gui-chat-plugin/avatarscript`, carries
+  the tool and shows the video in a player.
+
 ## 0.5.0 (2026-10-14)
 
 - **Bundled example scripts** (#8, fixes #7): the sample scripts `examples/*.avs` now ship in the

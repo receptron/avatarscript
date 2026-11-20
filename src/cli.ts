@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { z } from "zod";
 import { toWav } from "./audio.ts";
 import { loadAvatar, type Avatar } from "./avatar.ts";
 import { compile, detectLang } from "./compile.ts";
@@ -11,13 +12,15 @@ import { EXAMPLE_PREFIX, exampleNames, scriptSource } from "./examples.ts";
 import { render } from "./render.ts";
 import { parseJson } from "./json.ts";
 import { ScoreSchema, type Score } from "./score.ts";
-import { parseScript, plainScript, type Script } from "./script.ts";
+import { EMOTIONS, parseScript, plainScript, type Script } from "./script.ts";
+import { compileSong, parseSongTiming } from "./song.ts";
 import { createTts, isTtsProvider, TTS_PROVIDERS, type TextToSpeech } from "./tts/index.ts";
 
 const USAGE = `Usage:
   avatarscript make    --avatar <dir|url> --script <file.avs|file.txt|example:name> -o <video.mp4|.webm|.mov> [options]
   avatarscript compile --avatar <dir|url> --script <file.avs|file.txt|example:name> -o <name.score.json> [options]
   avatarscript render  --avatar <dir|url> --score <name.score.json> -o <video.mp4> [options]
+  avatarscript sing    --avatar <dir|url> --audio <song.mp3|.wav> --timing <song.timing.json> -o <video.mp4> [options]
 
 Speech (make, compile):
   --tts <provider>         elevenlabs, openai or gemini (keys: ELEVENLABS_API_KEY, OPENAI_API_KEY,
@@ -27,7 +30,14 @@ Speech (make, compile):
                            (provider options, such as a speaking style, come from avatar.json)
   --lang <code>            language of the text (default: front matter, then detected)
 
-Video (make, render):
+A song (sing): the audio and timing map JingleScript wrote for a score with lyrics; no speech is made
+  --audio <file>           the song (any format ffmpeg reads)
+  --timing <file>          its timing map (jinglescript-timing/1): the mouth follows the lyric syllables
+  --track <n>              the track whose lyrics are sung, when several have lyrics (default: the first)
+  --emotion <name>         the avatar's emotion for the song (default neutral)
+  --lang <code>            language of the lyrics (default: detected)
+
+Video (make, render, sing):
   --fps <n>                frames per second (default 30)
   --size <WxH>             video size (default 1280x720)
   --background <bg>        colour (CSS; "transparent" needs .webm or .mov) or image file behind the avatar
@@ -67,6 +77,10 @@ const { positionals, values: args } = parseArgs({
     avatar: { type: "string" },
     script: { type: "string" },
     score: { type: "string" },
+    audio: { type: "string" },
+    timing: { type: "string" },
+    track: { type: "string" },
+    emotion: { type: "string" },
     out: { type: "string", short: "o" },
     tts: { type: "string" },
     voice: { type: "string" },
@@ -91,7 +105,7 @@ function need(name: keyof typeof args): string {
   return v;
 }
 
-const num = (name: "fps" | "seed", fallback: number) => {
+const num = (name: "fps" | "seed" | "track", fallback: number) => {
   const v = args[name];
   if (v === undefined) return fallback;
   const n = Number(v);
@@ -131,6 +145,25 @@ async function compileStep(avatar: Avatar, scorePath: string): Promise<Score> {
   await writeFile(audioPath, toWav(audio));
   await writeFile(scorePath, JSON.stringify(score, null, 1) + "\n");
   console.log(`wrote ${scorePath} and ${audioPath} (${score.duration.toFixed(1)} s)`);
+  return score;
+}
+
+/** `sing`: a score from a JingleScript timing map, written beside the video, naming the song as its audio. */
+async function songStep(scorePath: string): Promise<Score> {
+  const audioPath = resolve(need("audio"));
+  const timingPath = resolve(need("timing"));
+  const emotion = args.emotion === undefined ? undefined : EMOTIONS.find((name) => name === args.emotion);
+  if (args.emotion !== undefined && emotion === undefined) throw new Error(`unknown --emotion "${args.emotion}" (use ${EMOTIONS.join(", ")})`);
+  const timing = parseSongTiming(parseJson(z.unknown(), await readFile(timingPath, "utf8"), timingPath), timingPath);
+  const score = await compileSong(timing, {
+    lang: args.lang,
+    audioName: relative(dirname(scorePath), audioPath),
+    emotion,
+    ...(args.track === undefined ? {} : { track: num("track", 0) }),
+  });
+  await mkdir(dirname(scorePath), { recursive: true });
+  await writeFile(scorePath, JSON.stringify(score, null, 1) + "\n");
+  console.log(`wrote ${scorePath} (${score.duration.toFixed(1)} s, ${score.captions.length} lyric lines)`);
   return score;
 }
 
@@ -185,6 +218,9 @@ async function main() {
   } else if (command === "make") {
     const scorePath = out.replace(/\.[^./]+$/, "") + ".score.json";
     await renderStep(avatar, await compileStep(avatar, scorePath), scorePath, out);
+  } else if (command === "sing") {
+    const scorePath = out.replace(/\.[^./]+$/, "") + ".score.json";
+    await renderStep(avatar, await songStep(scorePath), scorePath, out);
   } else {
     throw new Error(`unknown command "${command}"\n\n${USAGE}`);
   }

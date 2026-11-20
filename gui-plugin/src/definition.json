@@ -1,0 +1,73 @@
+{
+  "type": "function",
+  "name": "manageAvatarScript",
+  "description": "Make a video of an avatar that sings or speaks, with its mouth following the words. sing: the avatar sings a song made with JingleScript; render the song first (manageJingleScript, renderScore, with a `lyric` on the sung notes), then pass the `audioFile` and `timingFile` it answered. speak: the avatar says a script, text with directions such as [emotion:happy] and <nod>; action getGuide gives the syntax. The video takes about as long to make as it lasts. The video is shown to the user in a player.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "getGuide",
+          "sing",
+          "speak"
+        ],
+        "description": "What to do. sing: a video of the avatar singing a JingleScript song. speak: a video of the avatar saying a script. getGuide: how to write a script."
+      },
+      "audioFile": {
+        "description": "sing: path of the song's audio, the `audioFile` that manageJingleScript's renderScore answered.",
+        "type": "string"
+      },
+      "timingFile": {
+        "description": "sing: path of the song's timing map, the `timingFile` that renderScore answered. The mouth follows its lyric syllables.",
+        "type": "string"
+      },
+      "script": {
+        "description": "speak: what the avatar says, with directions inline: \"[emotion:happy] Hello! <nod>\". getGuide gives the syntax.",
+        "type": "string"
+      },
+      "emotion": {
+        "description": "sing: the avatar's emotion for the whole song (default neutral). In a script, [emotion:NAME] sets it.",
+        "type": "string",
+        "enum": [
+          "neutral",
+          "happy",
+          "sad",
+          "angry",
+          "surprised",
+          "relaxed"
+        ]
+      },
+      "subtitles": {
+        "description": "true draws the words over the video: each lyric line while it is sung, or each sentence while it is spoken.",
+        "type": "boolean"
+      },
+      "tts": {
+        "description": "speak: the text-to-speech provider; leave out to use the one this computer is set up for.",
+        "type": "string",
+        "enum": [
+          "elevenlabs",
+          "openai",
+          "gemini"
+        ]
+      },
+      "voice": {
+        "description": "speak: the provider's voice id; leave out for the avatar's own voice.",
+        "type": "string"
+      },
+      "avatar": {
+        "description": "The avatar: an https URL of an avatar package folder. Leave out for the default avatar.",
+        "type": "string",
+        "format": "uri"
+      },
+      "fileName": {
+        "description": "File stem of the video (default \"song\" for sing, \"speech\" for speak). A name that is taken becomes \"<stem>-2\", \"<stem>-3\" …",
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]{0,63}$"
+      }
+    },
+    "required": [
+      "action"
+    ]
+  }
+}
