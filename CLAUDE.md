@@ -37,3 +37,11 @@ Working notes for AI coding agents in this repo. What the project is and how to 
   `MESH_MOUTH: Record<Viseme, MeshMouth>` does) and type a name that must refer to something real
   with that union, so adding a member without handling it fails `typecheck` instead of being
   silently skipped.
+
+## Process
+
+- **Releasing:** both packages get the same version in a PR (`package.json`, `gui-plugin/package.json`
+  and its peer `^<version>`), with the entry in `docs/ChangeLog.md`. Once it is merged, the user
+  runs `yarn release` on a clean, up-to-date main: it publishes whichever package npm does not
+  have at that version (the library first, then the plugin) and tags `avatarscript@<version>`.
+  `yarn release --dry-run` checks and packs without publishing. Publishing is the user's to do.

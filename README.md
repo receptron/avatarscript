@@ -319,6 +319,11 @@ and the package smoke above.
 
 `yarn build` records the engine's package version in `dist/engine/source.json`.
 
+Releasing: both packages (this one and `gui-plugin/`) get the same version in a pull request; on a
+clean, up-to-date main, `yarn release` then publishes whichever of them npm does not have at that
+version (the library first) and tags `avatarscript@<version>`. `yarn release --dry-run` checks and
+packs without publishing.
+
 ## License
 
 [MIT](LICENSE). The bundled mesh avatar engine (`dist/engine/`) is
