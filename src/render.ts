@@ -11,7 +11,7 @@ import { installSubtitles, pageSubtitles } from "./render-subtitles.ts";
 import type { Score } from "./score.ts";
 import { captionAt, resolveSubtitles, type SubtitleStyleInput } from "./subtitles.ts";
 import { resolveView, type ViewInput } from "./view.ts";
-import { MESH_MOUTH, visemeAt } from "./visemes.ts";
+import { cueActions, momentAt, MOUTH_LEAD } from "./perform.ts";
 
 export interface RenderOptions {
   avatar: Avatar;
@@ -48,22 +48,16 @@ export function planFrames(score: Score, levels: Float32Array, fps: number, mout
   let cue = 0;
   for (let f = 0; f < levels.length; f++) {
     const t = f / fps;
-    const speaking = score.speaking.some(([a, b]) => t >= a && t < b);
-    const viseme = visemeAt(score.visemes, t + mouthLead);
-    const actions: FramePlan["actions"] = [];
-    while (cue < score.cues.length && score.cues[cue].t < t + 0.5 / fps) {
-      const c = score.cues[cue++];
-      if ("emotion" in c) actions.push(["emotion", c.emotion]);
-      else if ("motion" in c) actions.push(["motion", c.motion]);
-    }
+    const { actions, next } = cueActions(score.cues, cue, t + 0.5 / fps);
+    cue = next;
     const caption = captions ? (captionAt(score.captions, t)?.text ?? null) : null;
-    plans.push({ mouth: speaking || viseme !== "sil" ? MESH_MOUTH[viseme] : null, speaking, level: speaking ? levels[f] : 0, actions, caption });
+    plans.push({ ...momentAt(score, levels, fps, t, mouthLead), actions, caption });
   }
   return plans;
 }
 
 export async function render(options: RenderOptions): Promise<void> {
-  const { avatar, score, out, fps = 30, width = 1280, height = 720, seed = 1, mouthLead = 0.04 } = options;
+  const { avatar, score, out, fps = 30, width = 1280, height = 720, seed = 1, mouthLead = MOUTH_LEAD } = options;
   const unsupported = score.cues.filter((c) => "gaze" in c || "emphasis" in c);
   if (unsupported.length) console.warn(`note: ${unsupported.length} gaze/emphasis cue(s) are not rendered yet by the mesh runtime`);
   const audio = await readAudio(options.audioPath);

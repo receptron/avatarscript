@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Avatar } from "../src/avatar.ts";
 import type { RenderOptions } from "../src/render.ts";
-import { manage, ToolInputSchema, toolInputJsonSchema, type ToolCarrier } from "../src/tool.ts";
+import { toWav } from "../src/audio.ts";
+import { avatarForView, manage, PerformanceSchema, renderPerformance, ToolInputSchema, toolInputJsonSchema, type ToolCarrier } from "../src/tool.ts";
 
 const avatar: Avatar = {
   manifest: { format: "avatarscript-avatar/1", name: "test", runtime: "mesh-avatar/1", assets: { rig: "rig.json", layers: "layers.json" } },
@@ -109,7 +110,10 @@ describe("manageAvatarScript: sing", () => {
     expect(JSON.parse(second.text)).toMatchObject({ video: "avatarscript/song-2.mp4" });
     expect([...stored.keys()]).toEqual(["song.mp4", "song-2.mp4"]);
     expect(renders[1]).toMatchObject({ subtitles: true });
-    expect(renders[1]?.score.cues).toEqual([{ t: 0, emotion: "happy" }]);
+    expect(renders[1]?.score.cues).toEqual([
+      { t: 0, emotion: "happy" },
+      { t: 0.873, emotion: "happy" },
+    ]);
     await manage({ ...singInput, fileName: "morning" }, { ...made, avatar: "/avatars/host" });
     expect(loaded).toEqual([expect.stringContaining("mulmocast-media"), "https://example.com/avatars/me", "/avatars/host"]);
     expect([...stored.keys()]).toContain("morning.mp4");
@@ -174,6 +178,107 @@ describe("manageAvatarScript: speak", () => {
     expect(await text({ script: "hello" })).toContain("no text-to-speech key is set");
     vi.stubEnv("AVATARSCRIPT_TTS", "loud");
     expect(await text({ script: "hello" })).toContain('unknown text-to-speech provider: "loud"');
+  });
+});
+
+describe("manageAvatarScript: a carrier whose view shows the avatar itself (live)", () => {
+  // A 16-bit mono WAV at the rate audio is read at, so the voice levels need no ffmpeg.
+  const tone = toWav({ samples: Float32Array.from({ length: 4 * 24000 }, (_, i) => (i > 24000 && i < 72000 ? 0.3 * Math.sin(i / 8) : 0)), sampleRate: 24000 });
+  const liveSong = { "jinglescript/asa.wav": tone, "jinglescript/asa.timing.json": JSON.stringify(timing) };
+  const liveInput = ToolInputSchema.parse({ action: "sing", audioFile: "jinglescript/asa.wav", timingFile: "jinglescript/asa.timing.json", subtitles: true });
+
+  it("sing answers at once with a performance: the score, the audio and the voice levels, and nothing is rendered or loaded", async () => {
+    const { carrier: made, renders, loaded, stored } = carrier(liveSong);
+    const result = await manage(liveInput, { ...made, live: true });
+    expect(result.isError).toBe(false);
+    expect(result.video).toBeUndefined();
+    expect(JSON.parse(result.text)).toMatchObject({ ok: true, duration: 4, lyricLines: 1, shown: expect.stringContaining("performs it in the player") });
+    const performance = result.performance;
+    expect(performance).toMatchObject({ kind: "song", title: "song", duration: 4, width: 854, height: 480, subtitles: true });
+    expect(performance?.avatar).toBeUndefined();
+    // which avatar it is, without where the carrier's own is from: the same for the same avatar, another for another
+    expect(performance?.avatarKey).toMatch(/^[0-9a-f]{16}$/);
+    const elsewhere = await manage(liveInput, { ...made, live: true, avatar: "/avatars/host" });
+    expect(elsewhere.performance?.avatarKey).not.toBe(performance?.avatarKey);
+    expect(JSON.stringify(elsewhere.performance)).not.toContain("/avatars/host");
+    expect(performance?.audio).toBe(`data:audio/wav;base64,${tone.toString("base64")}`);
+    // a WAV is on time: the mouth is where the timing map says
+    expect(performance?.score.visemes[0]).toEqual([1, "aa"]);
+    expect(performance?.score.captions).toEqual([{ start: 1, end: 3, text: "あさ" }]);
+    // one level per frame at 30 fps: silent in the first second, loud in the second
+    expect(performance?.levels).toHaveLength(120);
+    expect(performance?.levels[10]).toBe(0);
+    expect(performance?.levels[45]).toBeGreaterThan(0.5);
+    expect([renders, loaded, [...stored]]).toEqual([[], [], []]);
+    expect(PerformanceSchema.safeParse(JSON.parse(JSON.stringify(performance))).success).toBe(true);
+  });
+
+  it("speak answers with a performance too, and a call's avatar is carried for the view", async () => {
+    vi.stubEnv("AVATARSCRIPT_TTS", "mock");
+    const { carrier: made, renders } = carrier();
+    const result = await manage(ToolInputSchema.parse({ action: "speak", script: "こんにちは。", avatar: "https://example.com/avatars/me" }), {
+      ...made,
+      live: true,
+    });
+    expect(result.performance).toMatchObject({ kind: "speech", title: "speech", subtitles: false, avatar: "https://example.com/avatars/me" });
+    expect(result.performance?.audio.startsWith("data:audio/wav;base64,")).toBe(true);
+    expect(result.performance?.levels.some((level) => level > 0.5)).toBe(true);
+    expect(renders).toEqual([]);
+  });
+
+  it("subtitles are what the call says, else what the script says: an explicit false turns a script's subtitles off", async () => {
+    vi.stubEnv("AVATARSCRIPT_TTS", "mock");
+    const { carrier: made } = carrier(liveSong);
+    const live = { ...made, live: true };
+    const script = "---\nsubtitles: on\nsubtitle-position: top\n---\nこんにちは。";
+    const speak = async (subtitles?: boolean) =>
+      (await manage(ToolInputSchema.parse({ action: "speak", script, ...(subtitles === undefined ? {} : { subtitles }) }), live)).performance;
+    expect((await speak())?.subtitles).toBe(true);
+    expect((await speak())?.score.subtitles?.position).toBe("top");
+    expect((await speak(false))?.subtitles).toBe(false);
+    expect((await speak(true))?.subtitles).toBe(true);
+    const sung = await manage(ToolInputSchema.parse({ action: "sing", audioFile: "jinglescript/asa.wav", timingFile: "jinglescript/asa.timing.json" }), live);
+    expect(sung.performance?.subtitles).toBe(false);
+  });
+
+  it("avatarForView gives the avatar a performance names, or the carrier's, and takes only an https URL from a view", async () => {
+    const { carrier: made, loaded } = carrier();
+    expect(await avatarForView(undefined, { ...made, avatar: "/avatars/host" })).toEqual({ rig: avatar.rig, assets: avatar.assets });
+    await avatarForView("https://example.com/avatars/me", { ...made, avatar: "/avatars/host" });
+    expect(loaded).toEqual(["/avatars/host", "https://example.com/avatars/me"]);
+    await expect(avatarForView("/etc/passwd", made)).rejects.toThrow("must be an https URL");
+    await expect(avatarForView("http://example.com/a", made)).rejects.toThrow("must be an https URL");
+  });
+
+  it("renderPerformance makes the video of a performance a view sends back, and keeps it", async () => {
+    const { carrier: made, renders, stored, loaded } = carrier(liveSong);
+    const { performance } = await manage({ ...liveInput, fileName: "morning" }, { ...made, live: true });
+    const sent: unknown = JSON.parse(JSON.stringify(performance));
+    const result = await renderPerformance(sent, { ...made, avatar: "/avatars/host" });
+    expect(result.isError).toBe(false);
+    expect(result.video).toMatchObject({ kind: "song", title: "morning", duration: 4, width: 854, height: 480, file: "avatarscript/morning.mp4" });
+    expect(stored.has("morning.mp4")).toBe(true);
+    expect(loaded).toEqual(["/avatars/host"]);
+    expect(renders[0]).toMatchObject({ width: 854, height: 480, subtitles: true });
+    expect(renders[0]?.audioPath.endsWith("audio.wav")).toBe(true);
+    expect(renders[0]?.score.visemes[0]).toEqual([1, "aa"]);
+  });
+
+  it("renderPerformance refuses what is not a performance, and one that names a file or another kind of audio", async () => {
+    const { carrier: made, renders } = carrier(liveSong);
+    const { performance } = await manage(liveInput, { ...made, live: true });
+    if (performance === undefined) throw new Error("no performance");
+    expect((await renderPerformance({ kind: "song" }, made)).text).toContain("That is not a performance this tool made");
+    const background = { ...performance, score: { ...performance.score, view: { ...performance.score.view, background: "/Users/me/secret.png" } } };
+    expect((await renderPerformance(background, made)).text).toContain("may not name a file");
+    expect((await renderPerformance({ ...performance, audio: "data:text/html;base64,AAAA" }, made)).isError).toBe(true);
+    expect((await renderPerformance({ ...performance, avatar: "/etc" }, made)).isError).toBe(true);
+    // the length that is rendered is the score's: it cannot differ from the checked one, nor exceed an hour
+    const longer = { ...performance, score: { ...performance.score, duration: 100_000_000 } };
+    expect((await renderPerformance(longer, made)).text).toContain("must be the performance's duration");
+    const hours = { ...performance, duration: 7200, score: { ...performance.score, duration: 7200 } };
+    expect((await renderPerformance(hours, made)).isError).toBe(true);
+    expect(renders).toEqual([]);
   });
 });
 

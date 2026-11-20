@@ -17,8 +17,9 @@ See [PLAN.md](PLAN.md) for the design and milestones.
 Early, but working end to end: speech from ElevenLabs, OpenAI or Gemini, Japanese and English
 lip sync, emotions and motions, rendered to MP4 with the mesh engine; an avatar that sings a song
 made with [JingleScript](https://github.com/receptron/jinglescript); a tool for LLMs
-(`manageAvatarScript`) and a [GUI Chat Protocol plugin](gui-plugin) that carries it. Not yet: gaze
-and emphasis rendering.
+(`manageAvatarScript`) and a [GUI Chat Protocol plugin](gui-plugin) that carries it, in which the
+avatar performs live in the page and a video is made only on request. Not yet: gaze and emphasis
+rendering.
 
 ## Install
 
@@ -203,21 +204,51 @@ The CLI's `--voice` and `--model` override the avatar's; its options are used as
 
 ## A tool for LLMs, and a GUI Chat Protocol plugin
 
-`manage(input, carrier)` is one tool, `manageAvatarScript`, with three actions: `sing` (a video of
-the avatar singing a JingleScript song, from the `audioFile` and `timingFile` that JingleScript's
-`renderScore` answers), `speak` (a video of the avatar saying a script) and `getGuide` (how to
-write a script). `ToolInputSchema` (zod) checks its arguments and `toolInputJsonSchema()` gives
-them as JSON Schema. The carrier decides what the model's paths may reach (`readFile`), where
-videos are kept (`saveFile`, which never overwrites) and which avatar is used when a call names
-none (default: the sample avatar's URL). A result has text for the model and, after a video was
-made, `video` (a data URI, its length and its captions) for a view.
+`manage(input, carrier)` is one tool, `manageAvatarScript`, with three actions: `sing` (the avatar
+sings a JingleScript song, from the `audioFile` and `timingFile` that JingleScript's `renderScore`
+answers), `speak` (the avatar says a script) and `getGuide` (how to write a script).
+`ToolInputSchema` (zod) checks its arguments and `toolInputJsonSchema()` gives them as JSON Schema.
+The carrier decides what the model's paths may reach (`readFile`), where videos are kept
+(`saveFile`, which never overwrites) and which avatar is used when a call names none (default: the
+sample avatar's URL). A result has text for the model and something for a view:
+
+- **`video`**: the video, rendered before the call answers (a data URI, its length and captions).
+- **`performance`**, for a carrier that sets `live`: the score, the audio and the voice levels, and
+  nothing rendered. The carrier's view shows the avatar itself with the mesh engine, at once. It
+  asks for the avatar with `avatarForView(url, carrier)` and, when the user wants a file, for the
+  video with `renderPerformance(performance, carrier)`. What a view sends back is checked
+  (`PerformanceSchema`), and it may name an avatar only as an https URL and no file at all.
 
 [`gui-plugin/`](gui-plugin) is that tool as a [GUI Chat Protocol](https://github.com/receptron/gui-chat-protocol)
-plugin, `@gui-chat-plugin/avatarscript`, with a video view; see its README for adding it to a host.
+plugin, `@gui-chat-plugin/avatarscript`; see its README for adding it to a host.
 
 `speak` uses the provider the call names, else `AVATARSCRIPT_TTS`, else the first of ElevenLabs,
 OpenAI and Gemini whose key is set, and says so when there is none; `sing` needs no key. A script
 from a model may not name files (a background image, a font file).
+
+### The avatar live in a page (`avatarscript/player`)
+
+The entry `avatarscript/player` reaches no Node built-in, so a page can load it. It makes a mesh
+avatar perform a score against a clock, the way the renderer does frame by frame:
+
+```js
+import { createMeshAvatar, parseRig } from "mesh-avatar";
+import { avatarRect, createPerformer } from "avatarscript/player";
+
+const rect = avatarRect(rig, width, height, score.view); // where the avatar goes on a width×height stage
+const avatar = await createMeshAvatar(canvas, { rig: parseRig(rig), assets, manual: true, padTop: rect.padTop });
+const performer = createPerformer(avatar, { score, levels }); // levels: the voice level per frame at 30 fps
+let last = performance.now();
+requestAnimationFrame(function tick(time) {
+  performer.update(audio.currentTime, (time - last) / 1000, !audio.paused && !audio.ended);
+  last = time;
+  requestAnimationFrame(tick);
+});
+```
+
+While playing, the mouth, the voice and the cues follow the time; paused, the avatar idles. A jump
+of more than half a second is a seek: the emotion in force there is taken, and the motions passed
+over are not played. Unlike a video, a live performance is not seeded: blinks differ between plays.
 
 ## Scripts
 

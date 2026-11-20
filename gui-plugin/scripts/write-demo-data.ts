@@ -1,10 +1,12 @@
-// yarn demo-data <folder> <audio> <timing.json>: makes a real video of the sample avatar singing a
-// JingleScript song (the two files, inside <folder>, as the plugin would be handed them by a
-// host) and writes the tool's result to demo/sample.json, for `yarn demo` to show in the view.
-// Needs Chrome (puppeteer) and ffmpeg; the result is not committed.
+// yarn demo-data <folder> <audio> <timing.json>: has the sample avatar sing a JingleScript song (the
+// two files, inside <folder>, as the plugin would be handed them by a host that shows avatars
+// live) and writes demo/sample.json for `yarn demo`: the tool's result (a performance), and the
+// answers to what the view will ask for (the avatar, and the video for a download).
+// Needs ffmpeg, and Chrome (puppeteer) for the video; the result is not committed.
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { executeManage } from "../src/index.ts";
+import { executeManage, loadAvatarForView, renderVideoForView } from "../src/index.ts";
+import { AVATAR_REQUEST, VIDEO_REQUEST } from "../src/requests.ts";
 
 const [folder, audioFile, timingFile] = process.argv.slice(2);
 if (folder === undefined || audioFile === undefined || timingFile === undefined) throw new Error("usage: yarn demo-data <folder> <audio> <timing.json>");
@@ -27,8 +29,11 @@ const byPath = {
   unlink: unused,
 };
 // The sample avatar from this checkout, so the demo needs no network.
-const avatar = resolve(import.meta.dirname, "../../avatars/ani");
-const result = await executeManage({ files: { byPath }, avatar }, { action: "sing", audioFile, timingFile, emotion: "happy", subtitles: true });
-if (result.data === undefined) throw new Error(result.message);
-await writeFile(new URL("../demo/sample.json", import.meta.url), JSON.stringify(result));
-console.log(`wrote demo/sample.json: ${result.message}`);
+const context = { files: { byPath }, avatar: resolve(import.meta.dirname, "../../avatars/ani"), liveAvatar: true };
+const result = await executeManage(context, { action: "sing", audioFile, timingFile, emotion: "happy", subtitles: true });
+if (result.data === undefined || "video" in result.data) throw new Error(result.message);
+// What the view will ask for: the avatar when it is shown, and the video when the user downloads it.
+const avatar = await loadAvatarForView(context, { kind: AVATAR_REQUEST });
+const video = await renderVideoForView(context, { kind: VIDEO_REQUEST, performance: result.data });
+await writeFile(new URL("../demo/sample.json", import.meta.url), JSON.stringify({ result, avatar, video }));
+console.log(`wrote demo/sample.json: ${result.message}\navatar: ${avatar.outcome}; video: ${video.outcome} ${video.message}`);

@@ -14,7 +14,7 @@
     "jsx": "preserve",
     // Type-check against the library's source, as the root repo does (so with the root's strictness:
     // the library is not written for noUncheckedIndexedAccess).
-    "paths": { "avatarscript": ["../src/index.ts"] }
+    "paths": { "avatarscript": ["../src/index.ts"], "avatarscript/player": ["../src/player.ts"] }
   },
   "include": ["src", "tests", "scripts", "demo", "vite.config.ts", "vitest.config.ts"]
 }

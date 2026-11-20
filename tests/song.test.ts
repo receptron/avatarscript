@@ -192,7 +192,14 @@ describe("compileSong", () => {
       [0.9, 2],
       [3.9, 5],
     ]);
-    expect(score.cues).toEqual([{ t: 0, emotion: "happy" }]);
+    // the emotion from the start, and again just before each line: the engine lets it go in a long rest
+    expect(score.cues).toEqual([
+      { t: 0, emotion: "happy" },
+      { t: 0.85, emotion: "happy" },
+      { t: 3.85, emotion: "happy" },
+    ]);
+    // a line at the very start does not repeat the cue at 0
+    expect((await compileSong(song([{ syllables: [["あ", 0.1, 1]] }]), { audioDelay: 0 })).cues).toEqual([{ t: 0, emotion: "neutral" }]);
     expect(score.audio).toBe("song.mp3");
   });
 

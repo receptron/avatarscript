@@ -3,41 +3,18 @@
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 import type { Browser, Page } from "puppeteer";
-import { z } from "zod";
 import type { Avatar } from "./avatar.ts";
-import { check } from "./json.ts";
+import type { Action, MeshAvatarApi, Moment } from "./perform.ts";
+import { avatarRect, type Rect } from "./stage.ts";
 import { isImageBackground, type View } from "./view.ts";
-import type { MeshMouth } from "./visemes.ts";
+
+export { avatarAspect, avatarRect } from "./stage.ts";
 
 /** One video frame's input to the engine. */
-export interface FramePlan {
-  mouth: MeshMouth | null;
-  speaking: boolean;
-  level: number;
-  actions: (["emotion", string] | ["motion", string])[];
+export interface FramePlan extends Moment {
+  actions: Action[];
   /** subtitle text to draw, when subtitles are on */
   caption: string | null;
-}
-
-/** The part of the mesh engine's avatar API the renderer drives (the mesh-avatar package's MeshAvatar). */
-interface MeshAvatarApi {
-  readonly motions: { id: string }[];
-  setEmotion(tag: string, options: { playMotion: boolean }): void;
-  play(id: string): void;
-  setSpeaking(on: boolean): void;
-  setVoiceLevel(level: number): void;
-  holdMouth(vowel: MeshMouth): void;
-  stopLipSync(): void;
-  setAutoMotion(on: boolean): void;
-  setAutoIdle(on: boolean): void;
-  advance(seconds: number, fps: number): void;
-}
-
-interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
 }
 
 /** What the render page keeps between batches. */
@@ -76,36 +53,6 @@ export interface PageOptions {
   seed: number;
   /** the engine's margin above the image, as a share of its height; default: see avatarRect() */
   padTop?: number;
-}
-
-// the engine fits the image into its canvas with these margins (mesh-avatar-studio renderer.js)
-const RigViewSchema = z.looseObject({
-  image: z.object({ width: z.number(), height: z.number() }),
-  view: z.object({ padTop: z.number().optional(), padSide: z.number().optional() }).optional(),
-});
-
-/**
- * Width ÷ height of the avatar's picture as the engine draws it: its image and margins. `padTop`
- * overrides the rig's margin above the image (a negative one crops the top of the image).
- */
-export function avatarAspect(rig: unknown, padTop?: number): number {
-  const r = check(RigViewSchema, rig, "rig");
-  return (r.image.width * (1 + 2 * (r.view?.padSide ?? 0))) / (r.image.height * (1 + (padTop ?? r.view?.padTop ?? 0)));
-}
-
-/**
- * Where the avatar goes in the frame, and the engine's top margin. A rig may crop the top of its
- * image (a negative padTop) because the illustration's top edge is flat; that is hidden only when
- * the avatar reaches the top of the frame. Placed lower, the crop would cut the head in mid-picture,
- * so the whole image is shown instead, unless `padTop` says otherwise.
- */
-export function avatarRect(rig: unknown, width: number, height: number, view: View, padTop?: number): Rect & { padTop: number } {
-  const h = Math.round((height * parseFloat(view.avatarScale)) / 100);
-  const y = Math.round((height * parseFloat(view.avatarY)) / 100 - h);
-  const rigPadTop = check(RigViewSchema, rig, "rig").view?.padTop ?? 0;
-  const pad = padTop ?? (y > 0 ? Math.max(0, rigPadTop) : rigPadTop);
-  const w = Math.round(h * avatarAspect(rig, pad));
-  return { x: Math.round((width * parseFloat(view.avatarX)) / 100 - w / 2), y, w, h, padTop: pad };
 }
 
 const IMAGE_TYPES: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };

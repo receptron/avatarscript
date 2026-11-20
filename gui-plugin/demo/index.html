@@ -8,12 +8,14 @@
       body {
         margin: 0;
         font-family: system-ui, sans-serif;
+        /* The host's colours: the card and the preview take their text colour from here. */
         background: #f3f5f9;
+        color: #1d2330;
       }
-      @media (prefers-color-scheme: dark) {
-        body {
-          background: #161a22;
-        }
+      /* A dark host, whatever the system's colour scheme: open the page with ?dark */
+      body.dark {
+        background: #161a22;
+        color: #e6e9ef;
       }
       main {
         max-width: 760px;
@@ -25,10 +27,8 @@
         border-radius: 10px;
         background: #fff;
       }
-      @media (prefers-color-scheme: dark) {
-        section {
-          background: #1f2530;
-        }
+      body.dark section {
+        background: #1f2530;
       }
       #preview {
         padding: 10px 14px;
@@ -40,6 +40,9 @@
       <section id="preview"></section>
       <section id="view"></section>
     </main>
+    <script>
+      if (new URLSearchParams(location.search).has("dark")) document.body.classList.add("dark");
+    </script>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

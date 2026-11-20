@@ -6,6 +6,9 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [vue()],
   resolve: {
-    alias: [{ find: /^avatarscript$/, replacement: resolve(import.meta.dirname, "../src/index.ts") }],
+    alias: [
+      { find: /^avatarscript\/player$/, replacement: resolve(import.meta.dirname, "../src/player.ts") },
+      { find: /^avatarscript$/, replacement: resolve(import.meta.dirname, "../src/index.ts") },
+    ],
   },
 });
