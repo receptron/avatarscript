@@ -40,6 +40,9 @@
     "README.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "packageManager": "yarn@1.22.22",
   "scripts": {
     "definition": "node scripts/write-definition.ts",

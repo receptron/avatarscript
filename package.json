@@ -44,6 +44,7 @@
     "avatarscript": "node src/cli.ts",
     "build": "node scripts/build.ts",
     "prepack": "yarn build",
+    "release": "node scripts/release.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --cache --cache-strategy content",
