@@ -7,7 +7,8 @@ import type { Viseme, VisemeEvent } from "../visemes.ts";
 import type { CharTime } from "./types.ts";
 
 type Vowel = "a" | "i" | "u" | "e" | "o";
-const VOWEL_VISEME: Record<Vowel, Viseme> = { a: "aa", i: "ih", u: "ou", e: "E", o: "oh" };
+/** The mouth of each Japanese vowel. */
+export const VOWEL_VISEME: Record<Vowel, Viseme> = { a: "aa", i: "ih", u: "ou", e: "E", o: "oh" };
 
 const ROWS: [Vowel, string][] = [
   ["a", "あかさたなはまやらわがざだばぱぁゃゎ"],

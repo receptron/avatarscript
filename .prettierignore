@@ -4,3 +4,5 @@ yarn.lock
 out
 *.md
 avatars
+gui-plugin/src/definition.json
+gui-plugin/demo/sample.json

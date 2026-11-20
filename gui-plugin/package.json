@@ -1,0 +1,70 @@
+{
+  "name": "@gui-chat-plugin/avatarscript",
+  "version": "0.6.0",
+  "description": "GUI Chat Protocol plugin for AvatarScript: the manageAvatarScript tool (an avatar that sings a JingleScript song or says a script), with a video view.",
+  "keywords": [
+    "gui-chat-protocol",
+    "avatarscript",
+    "avatar",
+    "lip-sync",
+    "video",
+    "vue"
+  ],
+  "homepage": "https://github.com/receptron/avatarscript/tree/main/gui-plugin#readme",
+  "bugs": {
+    "url": "https://github.com/receptron/avatarscript/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/receptron/avatarscript.git",
+    "directory": "gui-plugin"
+  },
+  "license": "MIT",
+  "author": "receptron",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "import": "./dist/vue.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "packageManager": "yarn@1.22.22",
+  "scripts": {
+    "definition": "node scripts/write-definition.ts",
+    "build": "vite build && vue-tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "demo": "vite demo --config vitest.config.ts",
+    "demo-data": "node scripts/write-demo-data.ts",
+    "prepack": "yarn build"
+  },
+  "peerDependencies": {
+    "avatarscript": "^0.6.0",
+    "gui-chat-protocol": "^2.3.0",
+    "vue": "^3.5.43"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "avatarscript": "link:..",
+    "gui-chat-protocol": "^2.3.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3",
+    "vue": "^3.5.43",
+    "vue-tsc": "^3.3.12",
+    "zod": "^4.6.5"
+  }
+}
